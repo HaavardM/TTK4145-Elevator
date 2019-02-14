@@ -36,6 +36,7 @@ const (
 	MoveDown
 	//Stop stops the motor
 	Stop
+
 	/*****************************Events*****************************/
 
 	//StopPressed indicates the stop button have been pressed

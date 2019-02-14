@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
@@ -26,7 +25,6 @@ func main() {
 	}
 	ctx := context.Background()
 	go elevatordriver.Run(ctx, conf)
-	fmt.Println("Hello!")
 	dir := elevatordriver.MoveUp
 	for {
 		select {
