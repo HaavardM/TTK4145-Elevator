@@ -4,36 +4,35 @@ import (
 	"fmt"
 	"time"
 	)
-const {
-	DoorOpen
-	DoorClosed
-	MovingUp 
-	MovingDown
-	Emergency
-}
 
+type State int
+const (
+	DoorOpen 	State = 0
+	DoorClosed	State = 1 
+	MovingUp  	State = 2
+	MovingDown 	State = 3
+	Emergency 	State = 4
+)
 
-//Dette var quene vi laget på torsdag
-var lightMatrix = [N_FLOORS][3]
-var buttonMatrix = [N_FLOORS][3]
+var elevatorFloor
 
-//Kan også lage de slik:
-type queue struct{
-	matrix [def.N_Floors][def.N_Buttons]order status
-}
-//queue representing the buttons on the lift panel
+// 0 = up button, 1= down button, 2 = command button for buttons
+var lightMatrix = [NumberofFloors][3]
+var buttonMatrix = [NumberofFloors][3]
 
 
 //Dette er timeren vi begynte på på torsdag
-func timer(){
+func doorOnTimer(){
+	åpne dør
 	select{
-		case 
+		 case timer := time.After(3*time.Second):
+		 	//lukk dør
 	}
-	timer := time.After(3*time.Second)
+	
 
 }
 
-//Kan bruke dette som en timer
+/*Kan bruke dette som en timer
 // doorTimer keeps a timer for the door open duration, It resets
 //when told to and notifies the state macine when it times out
 func doorTimer(timeout chan<- bool, reset <-chan bool){
@@ -50,13 +49,13 @@ func doorTimer(timeout chan<- bool, reset <-chan bool){
 		}
 	}
 }
-//Har ikke funnet ut hva .C er enda
+*/
 
 //Har ikke funnet helt riktig syntaks enda, så skrev config.DirStop for nå
 func doorTimeout (ch Channels){
-	switch state{
+	switch (state) {
 	case DoorOpen:
-		dir = queue.ChooseDirectioin(floor,dir)
+		dir = ChooseDirection(floor,dir)
 		ch.MotorDir <- dir
 		if dir == config.DirStop{
 			state = DoorClosed
@@ -73,33 +72,40 @@ func doorTimeout (ch Channels){
 	}
 }
 
-//vet ikke helt hvorden en skal gjøre det med MovingUp og MovingDown
-func floorReached(ch Channels, newFloor int){
-	floor = newFloor
-	ch.FloorLamp <-floors
-	switch state{
+
+func floorReached(int ElevatorFloor){
+	//skal vi sette lamper her, eller ordne det et annet sted? Spesielt denne som settes ved hver etasje
+	switch (state) {
+		case DoorOpen:
+			break
+
+		case DoorClosed:
+			break
+
 		case MovingUp:
-			if queue.ShouldStop(floor,dir){
-				ch.doorTimerReset <- true
-				queue.RemoveOrdersAt(floor, ch.OutgoingMsg)
-				ch.DoorLamp <- true
-				dir = def.DirStop
-				ch.MotorDir <- dir
-				state = DoorOPen
+		case MovingDown:
+			if ShouldStop(state,elevatorFloor,buttonMatrix) == true {
+				Event <- Stop //jeg skjønner ikke helt hvordan vi gjør dette, skal vi sende beskjed om at vi vil stoppe??
+				doorTOnimer() //tar seg av både åpme og lukke dør
+				floorServiced(floor, buttonMatrix)
+				
+				state = DoorOpen
 			}
+		case Emergency:
+			break
+			//skal vi gjøre noe her?
 	}
 }
 
 
 
-//Making functions for checking orders below and above if we need them
-//if we are to use them for multiple elevators we need a type elevator struct, that contains the 
-//elevator we are looking at
-//Elevator            [N_Elevators]Elev
-func ordersAbove(elevator Elev) bool{
-	for floor := elevator.Floor + 1; floor < N_Floors; floor++{
-		for button := 0; button < N_Buttons; button++{
-			if eleavtor.queue[floor][button]{
+//Assuming that we only have one elevator so that the buttonMatrix are all orders assigned
+//this specific elevator
+//Checking if orders above or below the current floor of the elevator
+func ordersAbove(elevatorFloor) bool{
+	for floor := elevatorFloor + 1; floor < NumberofFloors; floor++{
+		for button := 0; button < 3; button++{
+			if buttonMatrix[floor][button]{
 				return true
 			}
 		}
@@ -107,10 +113,10 @@ func ordersAbove(elevator Elev) bool{
 	return false
 }
 
-func ordersBelow(elevator Elev) bool {
-	for floor := 0; floor < elevator.Floor; floor++{
-		for button := 0; button < N_Buttons; button++{
-			if eleavtor.queue[floor][button]{
+func ordersBelow(int elevatorFloor) bool {
+	for floor := 0; floor < elevatorFloor; floor++{
+		for button := 0; button < 3; button++{
+			if buttonMatrix[floor][button]{
 				return true
 			}
 		}
@@ -119,8 +125,9 @@ func ordersBelow(elevator Elev) bool {
 }
 
 //Ikke ferdig
-func newOrder(ch Channels, newFloor in){
-	floor = newFloor
+//Her skjønner jeg ikke helt hva du har planlagt? Å legge til nye bestillinger i en kø?
+func newOrder(int buttonType, int floor){
+
 	switch state{
 	case DoorOpen:
 	case DoorClosed:
@@ -129,4 +136,132 @@ func newOrder(ch Channels, newFloor in){
 	case Emergency:
 	
 	}
+}
+
+func chooseDirection(direction direction, state state, int elevatorFloor) int{
+	switch (state) {
+		case DoorOpen:				//Velger state avhengig av hvilken retning vi var på vei i da vi stoppa
+			switch (direction){
+			case up:
+				if ordersAbove(elevatorFloor) {
+					return up
+				}
+				else if ordersBelow(elevatorFloor){
+					direction := down
+					return down
+				}
+				else {
+					direction := stop
+					return stop
+				}
+			}
+			case down:
+				if ordersBelow(elevatorFloor) {
+					return down
+				}
+				else if ordersAbove(elevatorFloor){
+					direction := up
+					return up
+				}
+				else {
+					direction := stop
+					return stop
+				}
+			}
+
+		case DoorClosed:			//Velger utfra om vi har ubetjente ordre
+			if ordersAbove(elevatorFloor) {
+				direction := up
+				return up
+			}
+			else if ordersBelow(elevatorFloor) {
+				direction := down
+				return down
+			}
+			else {
+				direction := stop
+				return stop
+			}
+
+		case MovingUp:				//fortsetter opp om vi fortsatt har ubetjente ordre opp, setter retning til ned om ikke
+			if (direction == up && ordersAbove(elevatorFloor)) {
+				direction := up
+				return up
+			}
+			else if (ordersBelow(elevatorFloor)){
+				direction := down
+				return down
+			}
+			else {
+				direction := stop
+				return stop
+			}
+
+		case MovingDown:
+			if (ordersBelow(elevatorFloor)){
+				direction := down
+				return down
+			}
+
+			else if (direction == up && ordersAbove(elevatorFloor)) {
+				direction := up
+				return up
+			}
+			
+			else {
+				direction := stop
+				return stop
+			}
+		case Emergency: 
+		//hva gjør vi her da?
+		break
+	}
+}
+
+
+
+//return true if there is an order on the current floor going in the right direction
+//or there are noe orders above/below.
+
+//Tror det blir feil å sette states her kanskje
+func shouldStop(state state, int elevatorFloor, int buttonMatrix) bool{
+	switch (state) {
+		case DoorOpen:
+			break
+
+		case DoorClosed:
+			break
+
+		case MovingUp:
+			if (buttonMatrix[elevatorFloor][BUTTON_CALL_UP] == 1){
+				return true
+			}
+			if (ordersAbove() == false){
+				return true
+			}
+			return false
+
+		case MovingDown:
+			if (buttonMatrix[elevatorFloor][BUTTON_CALL_DOWN] == 1){
+				return true
+			}
+			if (ordersBelow() == false){
+				return true
+			}
+			return false
+
+		case Emergency:
+			break
+			//hva gjør vi i emergency?
+	}
+	return false
+}
+
+func floorServiced(direction direction, int elevatorFloor, int buttonMatrix){
+	switch (direction){
+	case up:
+		
+	case down:
+	}
+
 }
