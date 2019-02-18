@@ -16,6 +16,26 @@ const (
 	stateEmergency
 )
 
+type state int
+
+func (s state) String() string {
+	switch s {
+	case stateMovingUp:
+		return "MOVING UP"
+	case stateMovingDown:
+		return "MOVING DOWN"
+	case stateDoorOpen:
+		return "DOOR OPEN"
+	case stateDoorClosed:
+		return "DOOR CLOSED"
+	case stateEmergency:
+		return "EMERGENCY"
+	default:
+		return "Unrecognized state"
+	}
+
+}
+
 //Direction used to define preferred elevator direction
 type Direction int
 
@@ -24,7 +44,22 @@ const (
 	UP Direction = iota + 1
 	//DOWN direction
 	DOWN
+	//NoDirection implies direction not important
+	NoDirection
 )
+
+func (d Direction) String() string {
+	switch d {
+	case UP:
+		return "UP"
+	case DOWN:
+		return "DOWN"
+	case NoDirection:
+		return "NO DIRECTION"
+	default:
+		return "Unrecognized direction"
+	}
+}
 
 //Order contains information about an elevator order
 type Order struct {
@@ -39,8 +74,6 @@ type Config struct {
 	Orders          <-chan []Order
 	ArrivedAtFloor  <-chan int
 }
-
-type state int
 
 type fsm struct {
 	state           state
@@ -68,6 +101,7 @@ func Run(ctx context.Context, conf Config) {
 		case event := <-conf.ElevatorEvents:
 			fsm.handleNewEvent(event)
 		case orders := <-conf.Orders:
+			log.Printf("New orders %v\n", orders)
 			fsm.handleNewOrders(orders)
 		case floor := <-conf.ArrivedAtFloor:
 			fsm.handleAtFloor(floor)

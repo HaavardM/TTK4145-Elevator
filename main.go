@@ -32,34 +32,31 @@ func main() {
 	}
 	ctx := context.Background()
 	go elevatordriver.Run(ctx, elevatorConf)
+	go newButtonPressed(onButtonPress, orders)
 	elevatorcontroller.Run(ctx, controllerConf)
 }
 
-func newButtonPressed(onButtonPress <- chan elevio.ButtonEvent, elevatorOrders <- chan []elevatorcontroller.Order ){
-	switch b.Button{
-	case elvio.BT_HallDown:
-		order := elevatorcontroller.Order {
-			Dir: elevatorcontroller.DOWN,
-			Floor: b.Floor, 
-	}
-	case elevio.BT_HallUp:
-		order := elevatorcontroller.Order {
-			Dir: elevatorcontroller.UP,
-			Floor: b.Floor, 
-	}
-	case elevio.BT_Cab:
-		switch Dir{
-		case elevatorcontroller.UP:
-			order := elevatorcontroller.Order {
-				Dir: elevatorcontroller.UP,
-				Floor: b.Floor, 
+func newButtonPressed(onButtonPress <-chan elevio.ButtonEvent, elevatorOrders chan<- []elevatorcontroller.Order) {
+	for {
+		b := <-onButtonPress
+		order := elevatorcontroller.Order{}
+		switch b.Button {
+		case elevio.BT_HallDown:
+			order = elevatorcontroller.Order{
+				Dir:   elevatorcontroller.DOWN,
+				Floor: b.Floor,
 			}
-		case elevatorcontroller.DOWN:
-			order := elevatorcontroller.Order {
-				Dir: elevatorcontroller.DOWN,
-				Floor: b.Floor, 
+		case elevio.BT_HallUp:
+			order = elevatorcontroller.Order{
+				Dir:   elevatorcontroller.UP,
+				Floor: b.Floor,
+			}
+		case elevio.BT_Cab:
+			order = elevatorcontroller.Order{
+				Dir:   elevatorcontroller.NoDirection,
+				Floor: b.Floor,
 			}
 		}
+		elevatorOrders <- []elevatorcontroller.Order{order}
 	}
-	elevatorOrders <- {order}
 }
