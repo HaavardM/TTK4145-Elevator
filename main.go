@@ -39,6 +39,7 @@ func main() {
 		case <-time.After(5 * time.Second):
 			elevatorCommand <- dir
 		case b := <-onButtonPress:
+			newButtonPressed(onButtonPress,elevatorOrders)
 			switch b.Button {
 			case elevio.BT_HallDown:
 				lightState <- elevatordriver.LightState{Type: elevatordriver.DownButtonLight, State: true, Floor: b.Floor}
@@ -49,5 +50,33 @@ func main() {
 			}
 		}
 	}
+}
 
+func newButtonPressed(onButtonPress <- chan elevio.ButtonEvent, elevatorOrders <- chan []elevatorcontroller.Order ){
+	switch b.Button{
+	case elvio.BT_HallDown:
+		order := elevatorcontroller.Order {
+			Dir: elevatorcontroller.DOWN,
+			Floor: b.Floor, 
+	}
+	case elevio.BT_HallUp:
+		order := elevatorcontroller.Order {
+			Dir: elevatorcontroller.UP,
+			Floor: b.Floor, 
+	}
+	case elevio.BT_Cab:
+		switch Dir{
+		case elevatorcontroller.UP:
+			order := elevatorcontroller.Order {
+				Dir: elevatorcontroller.UP,
+				Floor: b.Floor, 
+			}
+		case elevatorcontroller.DOWN:
+			order := elevatorcontroller.Order {
+				Dir: elevatorcontroller.DOWN,
+				Floor: b.Floor, 
+			}
+		}
+	}
+	elevatorOrders <- {order}
 }

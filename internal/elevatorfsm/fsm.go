@@ -1,4 +1,4 @@
-package 
+package elevatorcontroller
 //Elevator_controller
 
 import (
