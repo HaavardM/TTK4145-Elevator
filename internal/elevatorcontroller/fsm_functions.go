@@ -1,38 +1,13 @@
-package fsm
-//Elevator_controller
+package elevatorcontroller
 
+//Elevator_controller
+/*
 import (
 	"fmt"
 	"time"
 	)
 
-type State int
-const (
-	DoorOpen 	State = 0
-	DoorClosed	State = 1 
-	MovingUp  	State = 2
-	MovingDown 	State = 3
-	Emergency 	State = 4
-)
 
-var elevatorFloor
-
-// 0 = up button, 1= down button, 2 = command button for buttons
-var lightMatrix = [NumberofFloors][3]
-var buttonMatrix = [NumberofFloors][3]
-
-
-//Dette er timeren vi begynte på på torsdag
-func doorOnTimer(){
-	åpne dør
-	<- time.After(3*time.Second):
-		 	//lukk dør
-	}
-	
-
-}
-
-Kan bruke dette som en timer
 // doorTimer keeps a timer for the door open duration, It resets
 //when told to and notifies the state macine when it times out
 func doorTimer(timeout chan<- bool, reset <-chan bool){
@@ -56,7 +31,7 @@ func doorTimeout (ch Channels){
 	case DoorOpen:
 		dir = ChooseDirection(floor,dir)
 		ch.MotorDir <- dir
-		if dir == config.DirStop{
+		if dir == config.DirStop{= MovingUp
 			state = DoorClosed
 		}
 		//klarte ikke bestemme meg for beste måte å velg eom det var MovingUp eller MovingDown
@@ -87,7 +62,7 @@ func floorReached(int ElevatorFloor){
 				Event <- Stop //jeg skjønner ikke helt hvordan vi gjør dette, skal vi sende beskjed om at vi vil stoppe??
 				doorTOnimer() //tar seg av både åpme og lukke dør
 				floorServiced(floor, buttonMatrix)
-				
+
 				state = DoorOpen
 			}
 		case Emergency:
@@ -133,7 +108,7 @@ func newOrder(int buttonType, int floor){
 	case MovingUp:
 	case MovingDown:
 	case Emergency:
-	
+
 	}
 }
 
@@ -206,12 +181,12 @@ func chooseDirection(direction direction, state state, int elevatorFloor) int{
 				direction := up
 				return up
 			}
-			
+
 			else {
 				direction := stop
 				return stop
 			}
-		case Emergency: 
+		case Emergency:
 		//hva gjør vi her da?
 		break
 	}
@@ -253,8 +228,10 @@ func shouldStop(state state, int elevatorFloor, int buttonMatrix) bool{
 func floorServiced(direction direction, int elevatorFloor, int buttonMatrix){
 	switch (direction){
 	case up:
-		
+
 	case down:
 	}
 
 }
+
+*/
