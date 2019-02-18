@@ -1,4 +1,5 @@
 package fsm
+//Elevator_controller
 
 import (
 	"fmt"
@@ -24,15 +25,14 @@ var buttonMatrix = [NumberofFloors][3]
 //Dette er timeren vi begynte på på torsdag
 func doorOnTimer(){
 	åpne dør
-	select{
-		 case timer := time.After(3*time.Second):
+	<- time.After(3*time.Second):
 		 	//lukk dør
 	}
 	
 
 }
 
-/*Kan bruke dette som en timer
+Kan bruke dette som en timer
 // doorTimer keeps a timer for the door open duration, It resets
 //when told to and notifies the state macine when it times out
 func doorTimer(timeout chan<- bool, reset <-chan bool){
@@ -49,7 +49,6 @@ func doorTimer(timeout chan<- bool, reset <-chan bool){
 		}
 	}
 }
-*/
 
 //Har ikke funnet helt riktig syntaks enda, så skrev config.DirStop for nå
 func doorTimeout (ch Channels){
@@ -226,12 +225,6 @@ func chooseDirection(direction direction, state state, int elevatorFloor) int{
 //Tror det blir feil å sette states her kanskje
 func shouldStop(state state, int elevatorFloor, int buttonMatrix) bool{
 	switch (state) {
-		case DoorOpen:
-			break
-
-		case DoorClosed:
-			break
-
 		case MovingUp:
 			if (buttonMatrix[elevatorFloor][BUTTON_CALL_UP] == 1){
 				return true
