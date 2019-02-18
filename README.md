@@ -2,6 +2,7 @@ Elevator Project
 ================
 
 [![Build Status](https://build.shapingideas.fyi/job/thefuturezebras/job/project-thefuturezebras/job/master/2/badge/icon)](https://build.shapingideas.fyi/job/thefuturezebras/job/project-thefuturezebras/job/master/2/)
+
 Summary
 -------
 Create software for controlling `n` elevators working in parallel across `m` floors.
