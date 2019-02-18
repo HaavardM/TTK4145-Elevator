@@ -15,7 +15,7 @@ func main() {
 	onButtonPress := make(chan elevio.ButtonEvent)
 	lightState := make(chan elevatordriver.LightState)
 	conf := elevatordriver.Config{
-		Address:        "localhost:8080",
+		Address:        "localhost:15657",
 		NumberOfFloors: 4,
 		ArrivedAtFloor: arrivedAtFloor,
 		Commands:       elevatorCommand,
