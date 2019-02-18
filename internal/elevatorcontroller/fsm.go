@@ -93,6 +93,7 @@ func newFSM(elevatorCommand chan<- elevatordriver.Command) *fsm {
 	return temp
 }
 
+//Run starts the elevatorcontroller fsm
 func Run(ctx context.Context, conf Config) {
 	fsm := newFSM(conf.ElevatorCommand)
 	fsm.transitionToDoorOpen()
