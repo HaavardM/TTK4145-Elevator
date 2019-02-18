@@ -6,9 +6,9 @@ if [ ! -f SimElevatorServer ]; then
 fi
 start_elevator () {
     sleep 2
-    go run ../cmd/main.go
+    docker run --network host thefuturezebras/project
 }
 
 start_elevator&
-./SimElevatorServer --port=8080
+./SimElevatorServer --port=15657
 
