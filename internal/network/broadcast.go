@@ -33,6 +33,7 @@ func broadcastReceiver(ctx context.Context, port int, message chan<- interface{}
 				log.Panicf("Can't close broadcast")
 			}
 			break
+		default:
 		}
 
 		n, _, err := conn.ReadFrom(buf[0:])
@@ -44,14 +45,15 @@ func broadcastReceiver(ctx context.Context, port int, message chan<- interface{}
 
 		v := reflect.New(T)
 		//TODO Error handling?
-		json.Unmarshal(buf[0:n], &v)
-		message <- v
+		json.Unmarshal(buf[0:n], v.Interface())
+		message <- v.Interface()
 
 	}
 }
 
-func broadcastTransmitter(ctx context.Context, port int, message chan interface{}, T reflect.Type) {
+func broadcastTransmitter(ctx context.Context, port int, message <-chan interface{}, T reflect.Type) {
 	noConn := make(chan error)
+	transmitQueue := rchan2rwchan(ctx, message)
 	conn, addr, err := createConn(port)
 	if err != nil {
 		noConn <- err
@@ -74,21 +76,18 @@ func broadcastTransmitter(ctx context.Context, port int, message chan interface{
 				log.Panicf("Can't close broadcast")
 			}
 			break
-
-		case m := <-message:
-			if reflect.TypeOf(m) != T {
-				log.Panicf("Type published not consistet with receiver")
-			}
+		case m := <-transmitQueue:
 			data, err := json.Marshal(m)
 			if err != nil {
 				log.Println("Couldn't marshal message ", err)
+				continue
 			}
 			_, err = conn.WriteTo(data, addr)
 			if err != nil {
 				log.Println("Failed to write - attempting reconnect")
 				noConn <- err
 				//Do not skip message
-				go SendMessage(ctx, message, m)
+				go SendMessage(ctx, transmitQueue, m)
 			}
 		}
 	}

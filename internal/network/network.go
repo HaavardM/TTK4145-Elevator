@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"time"
 
 	"fmt"
 
@@ -15,6 +16,31 @@ type config struct {
 	port    int
 	send    interface{}
 	receive interface{}
+}
+
+type Message struct {
+	MSG string `json:"msg"`
+}
+
+func Run(ctx context.Context) {
+	s := make(chan Message)
+	r := make(chan Message)
+	conf := config{
+		id:      1,
+		port:    18843,
+		send:    s,
+		receive: r,
+	}
+
+	go RunAtMostOnce(ctx, conf)
+	for {
+		select {
+		case <-time.After(1 * time.Second):
+			s <- Message{MSG: "Hello there"}
+		case ret := <-r:
+			fmt.Println("Ret: ", ret)
+		}
+	}
 }
 
 func createConn(port int) (net.PacketConn, *net.UDPAddr, error) {

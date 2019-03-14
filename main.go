@@ -5,6 +5,7 @@ import (
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatorcontroller"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
 	"github.com/TTK4145/driver-go/elevio"
 )
 
@@ -33,7 +34,8 @@ func main() {
 	ctx := context.Background()
 	go elevatordriver.Run(ctx, elevatorConf)
 	go newButtonPressed(ctx, onButtonPress, orders)
-	elevatorcontroller.Run(ctx, controllerConf)
+	go elevatorcontroller.Run(ctx, controllerConf)
+	network.Run(ctx)
 }
 
 func newButtonPressed(ctx context.Context, onButtonPress <-chan elevio.ButtonEvent, elevatorOrders chan<- []elevatorcontroller.Order) {

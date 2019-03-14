@@ -9,15 +9,17 @@ import (
 //RunAtMostOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
 func RunAtMostOnce(ctx context.Context, conf config) {
-
 	//Create channels
-	atMostOnceTx := make(chan interface{})
+	atMostOnceTx, err := reflectchan2interfacechan(ctx, reflect.ValueOf(conf.send))
+	if err != nil {
+		log.Panicln("Error starting AtMostOnce: ", err)
+	}
 	atMostOnceRx := make(chan interface{})
 	defer close(atMostOnceRx)
 
 	//Get datatype of send element
-	T := reflect.TypeOf(conf.send)
-	if reflect.TypeOf(conf.receive) != T {
+	T := reflect.TypeOf(conf.send).Elem()
+	if reflect.TypeOf(conf.receive).Elem() != T {
 		log.Panicf("Inconsistent types in AtMostOnce")
 	}
 
@@ -31,17 +33,15 @@ func RunAtMostOnce(ctx context.Context, conf config) {
 		Chan: reflect.ValueOf(conf.receive),
 	}
 
-	//Convert between channel types
-	go reflect2chan(ctx, reflect.ValueOf(conf.send), atMostOnceTx)
-
 	//Wait for completion
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case m := <-atMostOnceRx:
-			out.Send = reflect.ValueOf(m)
-			reflect.Select([]reflect.SelectCase{out})
+			valuePtr := reflect.ValueOf(m)            //Pointer type
+			out.Send = reflect.Indirect(valuePtr)     //Get actual value
+			reflect.Select([]reflect.SelectCase{out}) //Send on channel
 		}
 
 	}
