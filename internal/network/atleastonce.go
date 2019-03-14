@@ -69,22 +69,36 @@ func RunAtLeastOnce(ctx context.Context, conf Config) {
 	}
 }
 
-func sendUntilAck(ctx context.Context, content atLeastOnceMsg, send chan<- atLeastOnceMsg, recv <-chan atLeastOnceMsg, ret chan<- atLeastOnceMsg) {
+func sendUntilAck(ctx context.Context, content atLeastOnceMsg, send chan<- atLeastOnceMsg, recv <-chan atLeastOnceMsg, ret chan<- atLeastOnceMsg, nodes <-chan []int) {
 	received := make(map[int]struct{})
 	acksExpected := []int{}
 	done := false
+
+	//Wait for
+	select {
+	case <-ctx.Done():
+		return
+	case acksExpected = <-nodes:
+	}
+
 	//While not received all acks
 	for !done {
 		select {
 		case <-ctx.Done():
 			return
+
+		case acksExpected = <-nodes:
+
 		case <-time.After(100 * time.Millisecond):
 			send <- content
+
 		case m := <-recv:
 			if m.Ack {
 				received[m.SenderID] = struct{}{}
 			}
 		}
+
+		//Check if all acks are received
 		for _, id := range acksExpected {
 			done = true
 			if _, present := received[id]; !present {
