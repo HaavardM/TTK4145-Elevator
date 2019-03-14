@@ -6,6 +6,8 @@ import (
 	"log"
 	"reflect"
 	"time"
+
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
 
 type atLeastOnceMsg struct {
@@ -27,7 +29,7 @@ func RunAtLeastOnce(ctx context.Context, conf config) {
 		log.Panic("Datatypes for send and receive not consistent")
 	}
 
-	atleastOnceTx, err := reflectchan2interfacechan(ctx, reflect.ValueOf(conf.send))
+	atleastOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.send))
 	if err != nil {
 		log.Panicln("Error starting atleastonce: ", err)
 	}
@@ -52,11 +54,6 @@ func RunAtLeastOnce(ctx context.Context, conf config) {
 				Data:      m,
 			}
 			go sendUntilAck(ctx, msg, bSend, bRecv, ret)
-		}
-
-		select {
-		case <-ctx.Done():
-			break
 		case r := <-ret:
 			b, err := json.Marshal(r.Data)
 			if err != nil {
@@ -72,15 +69,30 @@ func RunAtLeastOnce(ctx context.Context, conf config) {
 	}
 }
 
-func sendUntilAck(ctx context.Context, content atLeastOnceMsg, send chan<- atLeastOnceMsg, recv <-chan atLeastOnceMsg, ret <-chan atLeastOnceMsg) {
-	for {
+func sendUntilAck(ctx context.Context, content atLeastOnceMsg, send chan<- atLeastOnceMsg, recv <-chan atLeastOnceMsg, ret chan<- atLeastOnceMsg) {
+	received := make(map[int]struct{})
+	acksExpected := []int{}
+	done := false
+	//While not received all acks
+	for !done {
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(100 * time.Millisecond):
 			send <- content
-
+		case m := <-recv:
+			if m.Ack {
+				received[m.SenderID] = struct{}{}
+			}
+		}
+		for _, id := range acksExpected {
+			done = true
+			if _, present := received[id]; !present {
+				done = false
+				break
+			}
 		}
 	}
+	ret <- content
 
 }

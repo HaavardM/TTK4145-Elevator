@@ -4,13 +4,15 @@ import (
 	"context"
 	"log"
 	"reflect"
+
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
 
 //RunAtMostOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
 func RunAtMostOnce(ctx context.Context, conf config) {
 	//Create channels
-	atMostOnceTx, err := reflectchan2interfacechan(ctx, reflect.ValueOf(conf.send))
+	atMostOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.send))
 	if err != nil {
 		log.Panicln("Error starting AtMostOnce: ", err)
 	}
@@ -24,8 +26,8 @@ func RunAtMostOnce(ctx context.Context, conf config) {
 	}
 
 	//Launch transmitter and receiver
-	go broadcastTransmitter(ctx, conf.port, atMostOnceTx, T)
-	go broadcastReceiver(ctx, conf.port, atMostOnceRx, T)
+	go broadcastTransmitter(ctx, conf.port, conf.id, atMostOnceTx, T)
+	go broadcastReceiver(ctx, conf.port, conf.id, atMostOnceRx, T)
 
 	//Create reflect select statement
 	out := reflect.SelectCase{
