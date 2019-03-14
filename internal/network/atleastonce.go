@@ -53,7 +53,10 @@ func RunAtLeastOnce(ctx context.Context, conf Config) {
 				MessageID: "TODO",
 				Data:      m,
 			}
-			go sendUntilAck(ctx, msg, bSend, bRecv, ret)
+			nodes := make(chan []int)
+			go sendUntilAck(ctx, msg, bSend, bRecv, ret, nodes)
+			//TODO REMOVE THIS
+			nodes <- []int{1, 2, 3}
 		case r := <-ret:
 			b, err := json.Marshal(r.Data)
 			if err != nil {
