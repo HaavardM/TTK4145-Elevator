@@ -10,9 +10,9 @@ import (
 
 //RunAtMostOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
-func RunAtMostOnce(ctx context.Context, conf config) {
+func RunAtMostOnce(ctx context.Context, conf Config) {
 	//Create channels
-	atMostOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.send))
+	atMostOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	if err != nil {
 		log.Panicln("Error starting AtMostOnce: ", err)
 	}
@@ -20,19 +20,19 @@ func RunAtMostOnce(ctx context.Context, conf config) {
 	defer close(atMostOnceRx)
 
 	//Get datatype of send element
-	T := reflect.TypeOf(conf.send).Elem()
-	if reflect.TypeOf(conf.receive).Elem() != T {
+	T := reflect.TypeOf(conf.Send).Elem()
+	if reflect.TypeOf(conf.Receive).Elem() != T {
 		log.Panicf("Inconsistent types in AtMostOnce")
 	}
 
 	//Launch transmitter and receiver
-	go broadcastTransmitter(ctx, conf.port, conf.id, atMostOnceTx, T)
-	go broadcastReceiver(ctx, conf.port, conf.id, atMostOnceRx, T)
+	go broadcastTransmitter(ctx, conf.Port, conf.ID, atMostOnceTx, T)
+	go broadcastReceiver(ctx, conf.Port, conf.ID, atMostOnceRx, T)
 
 	//Create reflect select statement
 	out := reflect.SelectCase{
 		Dir:  reflect.SelectSend,
-		Chan: reflect.ValueOf(conf.receive),
+		Chan: reflect.ValueOf(conf.Receive),
 	}
 
 	//Wait for completion

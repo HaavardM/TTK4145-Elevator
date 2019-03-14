@@ -11,25 +11,29 @@ import (
 	"github.com/TTK4145/Network-go/network/conn"
 )
 
-type config struct {
-	id      int
-	port    int
-	send    interface{}
-	receive interface{}
-}
-
-type Message struct {
-	MSG string `json:"msg"`
+//Config contains common information for starting network modules
+type Config struct {
+	//ID is the unique id of this node
+	ID int
+	//Port is the UDP port number to use for communication
+	Port int
+	//Send is a channel to use for sending to network: Must be a channel!!
+	Send interface{}
+	//Receive is a channel used to receive from network. Must be same type as Send!
+	Receive interface{}
 }
 
 func Run(ctx context.Context) {
+	type Message struct {
+		MSG string `json:"msg"`
+	}
 	s := make(chan Message)
 	r := make(chan Message)
-	conf := config{
-		id:      1,
-		port:    18843,
-		send:    s,
-		receive: r,
+	conf := Config{
+		ID:      1,
+		Port:    18843,
+		Send:    s,
+		Receive: r,
 	}
 
 	go RunAtMostOnce(ctx, conf)

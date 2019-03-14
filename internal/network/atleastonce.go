@@ -19,26 +19,26 @@ type atLeastOnceMsg struct {
 
 //RunAtLeastOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
-func RunAtLeastOnce(ctx context.Context, conf config) {
+func RunAtLeastOnce(ctx context.Context, conf Config) {
 	bSend := make(chan atLeastOnceMsg)
 	bRecv := make(chan atLeastOnceMsg)
 	ret := make(chan atLeastOnceMsg)
 
-	T := reflect.TypeOf(conf.send).Elem()
-	if reflect.TypeOf(conf.receive).Elem() != T {
+	T := reflect.TypeOf(conf.Send).Elem()
+	if reflect.TypeOf(conf.Receive).Elem() != T {
 		log.Panic("Datatypes for send and receive not consistent")
 	}
 
-	atleastOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.send))
+	atleastOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	if err != nil {
 		log.Panicln("Error starting atleastonce: ", err)
 	}
 
-	c := config{
-		send:    bSend,
-		receive: bRecv,
-		id:      conf.id,
-		port:    conf.port,
+	c := Config{
+		Send:    bSend,
+		Receive: bRecv,
+		ID:      conf.ID,
+		Port:    conf.Port,
 	}
 	go RunAtMostOnce(ctx, c)
 
@@ -49,7 +49,7 @@ func RunAtLeastOnce(ctx context.Context, conf config) {
 		case m := <-atleastOnceTx:
 			msg := atLeastOnceMsg{
 				Ack:       false,
-				SenderID:  conf.id,
+				SenderID:  conf.ID,
 				MessageID: "TODO",
 				Data:      m,
 			}
