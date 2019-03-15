@@ -10,6 +10,7 @@ import (
 
 //RunAtMostOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
+//We use reflection to allow multiple channel types. The network module does not care what the user want to send.
 func RunAtMostOnce(ctx context.Context, conf Config) {
 	//Create channels
 	atMostOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
@@ -25,9 +26,10 @@ func RunAtMostOnce(ctx context.Context, conf Config) {
 		log.Panicf("Inconsistent types in AtMostOnce")
 	}
 
+	template := reflect.New(T).Interface()
 	//Launch transmitter and receiver
-	go broadcastTransmitter(ctx, conf.Port, conf.ID, atMostOnceTx, T)
-	go broadcastReceiver(ctx, conf.Port, conf.ID, atMostOnceRx, T)
+	go broadcastTransmitter(ctx, conf.Port, conf.ID, atMostOnceTx)
+	go broadcastReceiver(ctx, conf.Port, conf.ID, atMostOnceRx, template)
 
 	//Create reflect select statement
 	out := reflect.SelectCase{

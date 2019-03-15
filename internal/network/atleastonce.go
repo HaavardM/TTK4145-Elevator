@@ -32,16 +32,19 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 
 	recvChan := reflect.ValueOf(conf.Receive)
 
+	//Get type of data sent on input/output channel
 	T := reflect.TypeOf(conf.Send).Elem()
 	if reflect.TypeOf(conf.Receive).Elem() != T {
 		log.Panic("Datatypes for send and receive not consistent")
 	}
 
-	atleastOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
+	//Get input channel as a type agnostic interface channel
+	atleastOnceInput, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	if err != nil {
 		log.Panicln("Error starting atleastonce: ", err)
 	}
 
+	//Start AtMostOnce service
 	c := Config{
 		Send:    bSend,
 		Receive: bRecv,
@@ -49,11 +52,12 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 		Port:    conf.Port,
 	}
 	go RunAtMostOnce(ctx, c)
+
 	for {
 		select {
 		case <-ctx.Done():
-			break
-		case m := <-atleastOnceTx:
+			return
+		case m := <-atleastOnceInput:
 			msg := atLeastOnceMsg{
 				Ack:       false,
 				SenderID:  conf.ID,
@@ -72,7 +76,6 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 				log.Panicln("Failed unmarshal")
 			}
 			recvChan.Send(reflect.Indirect(v))
-
 		}
 	}
 }

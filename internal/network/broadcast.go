@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"reflect"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
@@ -15,7 +14,8 @@ type broadcastMsg struct {
 	Data     interface{} `json:"data"`
 }
 
-func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, T reflect.Type) {
+//broadcastReceiver receives JSON messages from a UDP broadcast port and unmarshalls into template
+func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, template interface{}) {
 	noConn := make(chan error)
 	conn, _, err := createConn(port)
 	defer conn.Close()
@@ -50,7 +50,7 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 
 		//Create message template
 		msg := broadcastMsg{
-			Data: reflect.New(T).Interface(),
+			Data: template,
 		}
 		json.Unmarshal(buf[0:n], &msg)
 
@@ -61,7 +61,8 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 	}
 }
 
-func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan interface{}, T reflect.Type) {
+//
+func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan interface{}) {
 	noConn := make(chan error)
 	transmitQueue := utilities.RChan2RWChan(ctx, message)
 	conn, addr, err := createConn(port)
