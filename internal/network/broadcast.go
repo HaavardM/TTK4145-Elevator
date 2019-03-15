@@ -47,21 +47,15 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 			noConn <- err
 			continue
 		}
-		msg := broadcastMsg{}
+
+		//Create message template
+		msg := broadcastMsg{
+			Data: reflect.New(T).Interface(),
+		}
 		json.Unmarshal(buf[0:n], &msg)
 
 		if msg.SenderID != id {
-			b, err := json.Marshal(msg.Data)
-			if err != nil {
-				log.Println("Error marshalling json")
-			}
-			v := reflect.New(T)
-			//TODO Error handling?
-			err = json.Unmarshal(b, v.Interface())
-			if err != nil {
-				log.Println("Error unmarshalling json")
-			}
-			message <- v.Interface()
+			message <- msg.Data
 		}
 
 	}

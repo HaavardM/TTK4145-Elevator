@@ -17,12 +17,20 @@ type atLeastOnceMsg struct {
 	Data      interface{} `json:"data"`
 }
 
+//AtLeastOnceConfig contains configuration for the atLeastOnce QoS
+type AtLeastOnceConfig struct {
+	Config
+	NodesOnline <-chan []int
+}
+
 //RunAtLeastOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
-func RunAtLeastOnce(ctx context.Context, conf Config) {
+func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 	bSend := make(chan atLeastOnceMsg)
 	bRecv := make(chan atLeastOnceMsg)
 	ret := make(chan atLeastOnceMsg)
+
+	recvChan := reflect.ValueOf(conf.Receive)
 
 	T := reflect.TypeOf(conf.Send).Elem()
 	if reflect.TypeOf(conf.Receive).Elem() != T {
@@ -41,7 +49,6 @@ func RunAtLeastOnce(ctx context.Context, conf Config) {
 		Port:    conf.Port,
 	}
 	go RunAtMostOnce(ctx, c)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -53,10 +60,7 @@ func RunAtLeastOnce(ctx context.Context, conf Config) {
 				MessageID: "TODO",
 				Data:      m,
 			}
-			nodes := make(chan []int)
-			go sendUntilAck(ctx, msg, bSend, bRecv, ret, nodes)
-			//TODO REMOVE THIS
-			nodes <- []int{1, 2, 3}
+			go sendUntilAck(ctx, msg, bSend, bRecv, ret, conf.NodesOnline)
 		case r := <-ret:
 			b, err := json.Marshal(r.Data)
 			if err != nil {
@@ -67,6 +71,7 @@ func RunAtLeastOnce(ctx context.Context, conf Config) {
 			if err != nil {
 				log.Panicln("Failed unmarshal")
 			}
+			recvChan.Send(reflect.Indirect(v))
 
 		}
 	}
