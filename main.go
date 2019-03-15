@@ -7,6 +7,7 @@ import (
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatorcontroller"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
@@ -14,32 +15,45 @@ import (
 )
 
 func main() {
+	//Main context
+	ctx := context.Background()
+
+	//Get configration
+	conf := configuration.GetConfig()
+
+	//Create neccessary channels for the elevator
 	arrivedAtFloor := make(chan int)
 	elevatorCommand := make(chan elevatordriver.Command)
 	elevatorEvents := make(chan elevatordriver.Event)
 	onButtonPress := make(chan elevio.ButtonEvent)
 	lightState := make(chan elevatordriver.LightState)
+	orders := make(chan []elevatorcontroller.Order)
+
+	//Create elevator configuration
 	elevatorConf := elevatordriver.Config{
-		Address:        "localhost:15657",
-		NumberOfFloors: 4,
+		Address:        fmt.Sprintf("localhost:%d", conf.ElevatorPort),
+		NumberOfFloors: conf.Floors,
 		ArrivedAtFloor: arrivedAtFloor,
 		Commands:       elevatorCommand,
 		Events:         elevatorEvents,
 		OnButtonPress:  onButtonPress,
 		SetStatusLight: lightState,
 	}
-	orders := make(chan []elevatorcontroller.Order)
+
+	//Create elevator controller configuration
 	controllerConf := elevatorcontroller.Config{
 		ElevatorCommand: elevatorCommand,
 		ElevatorEvents:  elevatorEvents,
 		Orders:          orders,
 		ArrivedAtFloor:  arrivedAtFloor,
 	}
-	ctx := context.Background()
-	go elevatordriver.Run(ctx, elevatorConf)
-	go newButtonPressed(ctx, onButtonPress, orders)
-	go elevatorcontroller.Run(ctx, controllerConf)
 
+	//Launch modules
+	go elevatordriver.Run(ctx, elevatorConf)
+	go elevatorcontroller.Run(ctx, controllerConf)
+	go newButtonPressed(ctx, onButtonPress, orders)
+
+	/*************************TEST CODE***********************/
 	atLeastOnceSend := make(chan string)
 	atMostOnceSend := make(chan string)
 	atLeastOnceRecv := make(chan string)
@@ -79,6 +93,8 @@ func main() {
 		}
 	}
 
+	//Wait for completion
+	<-ctx.Done()
 }
 
 func newButtonPressed(ctx context.Context, onButtonPress <-chan elevio.ButtonEvent, elevatorOrders chan<- []elevatorcontroller.Order) {
