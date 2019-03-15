@@ -98,8 +98,9 @@ func sendUntilAck(ctx context.Context, content atLeastOnceMsg, send chan<- atLea
 		case <-ctx.Done():
 			return
 
-		case acksExpected = <-nodes:
-
+		/*case acksExpected = <-nodes:
+		fmt.Println("Updating expected acks", acksExpected)
+		*/
 		case <-time.After(100 * time.Millisecond):
 			send <- content
 
