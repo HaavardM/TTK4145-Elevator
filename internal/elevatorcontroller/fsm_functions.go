@@ -1,3 +1,6 @@
+/* ALT ER UBRUKT
+
+
 package elevatorcontroller
 import (
 	"context"
@@ -24,11 +27,8 @@ func shouldStop(floor int) bool {
 			return true
 		}
 		return false
-	/*Vi skal vel ikke håndtere disse tre statene i should stop. DoorOpen og closed er jo allerede på 
-	etasje og bør ikke være nødvendig å spørre om å skulle stoppe
 	case stateDoorOpen:
 	case stateDoorClosed:
-	case stateEmergency:*/
 	}
 	return false
 }
@@ -69,3 +69,84 @@ func deleteOrders(floor int) {
 	ordersNoDir[floor] == 0
 	
 }
+
+func chooseDirection(direction direction, state state, int elevatorFloor) int{
+	switch (state) {
+		case DoorOpen:				//Velger state avhengig av hvilken retning vi var på vei i da vi stoppa
+			switch (direction){
+			case up:
+				if ordersAbove(elevatorFloor) {
+					return up
+				}
+				else if ordersBelow(elevatorFloor){
+					direction := down
+					return down
+				}
+				else {
+					direction := stop
+					return stop
+				}
+			}
+			case down:
+				if ordersBelow(elevatorFloor) {
+					return down
+				}
+				else if ordersAbove(elevatorFloor){
+					direction := up
+					return up
+				}
+				else {
+					direction := stop
+					return stop
+				}
+			}
+
+		case DoorClosed:			//Velger utfra om vi har ubetjente ordre
+			if ordersAbove(elevatorFloor) {
+				direction := up
+				return up
+			}
+			else if ordersBelow(elevatorFloor) {
+				direction := down
+				return down
+			}
+			else {
+				direction := stop
+				return stop
+			}
+
+		case MovingUp:				//fortsetter opp om vi fortsatt har ubetjente ordre opp, setter retning til ned om ikke
+			if (direction == up && ordersAbove(elevatorFloor)) {
+				direction := up
+				return up
+			}
+			else if (ordersBelow(elevatorFloor)){
+				direction := down
+				return down
+			}
+			else {
+				direction := stop
+				return stop
+			}
+
+		case MovingDown:
+			if (ordersBelow(elevatorFloor)){
+				direction := down
+				return down
+			}
+
+			else if (direction == up && ordersAbove(elevatorFloor)) {
+				direction := up
+				return up
+			}
+
+			else {
+				direction := stop
+				return stop
+			}
+		case Emergency:
+		//hva gjør vi her da?
+		break
+	}
+}
+*/
