@@ -18,13 +18,13 @@ type atMostOnceMsg struct {
 //We use reflection to allow multiple channel types. The network module does not care what the user want to send.
 func RunAtMostOnce(ctx context.Context, conf Config) {
 	//Create channels
-	atMostOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
+	inChan, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
+	atMostOnceTx := make(chan interface{})
 	if err != nil {
 		log.Panicln("Error starting AtMostOnce: ", err)
 	}
 	atMostOnceRx := make(chan interface{})
 	defer close(atMostOnceRx)
-
 	//Get datatype of send element
 	T := reflect.TypeOf(conf.Send).Elem()
 	if reflect.TypeOf(conf.Receive).Elem() != T {
@@ -56,6 +56,11 @@ func RunAtMostOnce(ctx context.Context, conf Config) {
 				outChan.Send(reflect.Indirect(valuePtr)) //Get actual value
 			} else {
 				log.Println("Invalid type")
+			}
+		case m := <-inChan:
+			atMostOnceTx <- atMostOnceMsg{
+				SenderID: &conf.ID,
+				Data:     m,
 			}
 		}
 
