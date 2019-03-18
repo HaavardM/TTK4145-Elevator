@@ -115,21 +115,47 @@ func Run(ctx context.Context, conf Config) {
 }
 
 func (f *fsm) handleNewEvent(event elevatordriver.Event) {
-
+//????Hvilke events? Er ikke det bare stop pressed og released? Det skal vi vel ikke ha med
 }
 
 func (f *fsm) handleNewOrders(orders []Order) {
-	switch f.state {
-	case stateMovingUp: //Oppdater kø
-	case stateMovingDown: //Oppdater kø
-	case stateDoorOpen:
-	case stateDoorClosed:
+addOrders([]Order)
+	/*
+	Skal vi legge til i liste i det hele tatt? buttonpress i heis må vel legges til, men om vi skal
+	kunne bytte retning med én gang en ny ordre kommer er vel ikke det nødvendig for bestilling av heis?
+	Lettere måte å gjøre dette på en switch i switch??
+	*/
+	
+	switch Order.Dir {
+	case DOWN:
+		switch f.state {
+		case stateMovingUp: 
+			fallthrough
+		case stateDoorOpen:
+			fallthrough
+		case stateDoorClosed:
+			f.transitionToMovingDown()
+		case stateMovingDown:
+			//trenger vel ikke gjøre noe her?
+		}
+	case UP:
+		switch f.state {
+		case stateMovingDown: 
+			fallthrough
+		case stateDoorOpen:
+			fallthrough
+		case stateDoorClosed:
+			f.transitionToMovingUp()
+		case stateMovingUp:
+			//trenger vel ikke gjøre noe her?
+		}
+	case NoDirection:
+		switch f.state {
+		//hva skal prioriteres her da??
+		}
 	}
 }
 
-func shouldStop(floor int) bool {
-	return true
-}
 
 func (f *fsm) handleAtFloor(floor int) {
 	switch f.state {
@@ -149,6 +175,9 @@ func (f *fsm) transitionToDoorOpen() {
 	//TODO Avoid hardcoded duration
 	f.timer.Reset(3 * time.Second)
 	f.state = stateDoorOpen
+	f.handleTimerElapsed() //er det dumt å legge den her?
+	// LEGGE INN HER AT ORDRE ER FULLFØRT?? Hvor skal det sendes? Event?
+	//altså slette fra egen liste (deleteOrder) og sende bekreftelse
 }
 
 func (f *fsm) transitionToDoorClosed() {
@@ -162,4 +191,16 @@ func (f *fsm) handleTimerElapsed() {
 	case stateDoorOpen:
 		f.transitionToDoorClosed()
 	}
+}
+
+func (f *fsm) transitionToMovingDown() {
+	log.Println("Transition to moving down")
+	f.elevatorCommand <- elevatordriver.MoveDown
+	f.state = stateMovingDown
+}
+
+func (f *fsm) transitionToMovingUp() {
+	log.Println("Transition to moving up")
+	f.elevatorCommand <- elevatordriver.MoveUp
+	f.state = stateMovingUp
 }
