@@ -95,6 +95,8 @@ func main() {
 			fmt.Println(m)
 		case <-time.After(1 * time.Second):
 			atMostOnceSend <- "Hello again AMO"
+		case m := <-atMostOnceRecv:
+			fmt.Println(m)
 		}
 	}
 
