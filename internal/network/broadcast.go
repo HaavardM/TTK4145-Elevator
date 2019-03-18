@@ -51,7 +51,7 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 		if err != nil {
 			log.Println("Invalid json format in message")
 		} else {
-			message <- template
+			message <- msg
 		}
 
 	}
