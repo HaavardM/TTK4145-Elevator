@@ -83,6 +83,7 @@ type fsm struct {
 	elevatorCommand chan<- elevatordriver.Command
 	currentOrder	Order
 	orderCompleted 	chan<- Order
+	currentFloor int
 }
 
 const doorOpenDuration = 3*time.Second
@@ -117,13 +118,14 @@ func Run(ctx context.Context, conf Config) {
 	fsm := newFSM(conf.ElevatorCommand, conf.OrderCompleted)
 	fsm.transitionToDoorOpen()
 	fsm.init(conf)
+	log.Println("done")
 	for {
 		select {
 		case fsm.currentOrder = <-conf.Order:							//fsm.currentOrder 
 			log.Printf("New orders %v\n", fsm.currentOrder)
-			fsm.handleNewOrders(fsm.currentOrder.Floor, conf)
-		case floor := <-conf.ArrivedAtFloor:
-			fsm.handleAtFloor(floor)
+			fsm.handleNewOrders(conf)
+		case fsm.currentFloor = <-conf.ArrivedAtFloor:
+			fsm.handleAtFloor()
 		case <-fsm.timer.C:
 			fsm.handleTimerElapsed()
 		case <-ctx.Done():
@@ -134,36 +136,31 @@ func Run(ctx context.Context, conf Config) {
 
 
 //Handles incomming orders from the scheduler module
-func (f *fsm) handleNewOrders(floor int, conf Config) {
+func (f *fsm) handleNewOrders(conf Config) {
 	targetFloor := f.currentOrder.Floor
+	currentFloor := f.currentFloor
 	targetDir := f.currentOrder.Dir
 
-	if (targetDir == UP && floor == conf.NumberOfFloors-1) || (targetDir == DOWN && floor == 0) {
+	if (targetDir == UP && targetFloor >= conf.NumberOfFloors) || (targetDir == DOWN && targetFloor <= 0) {
 		log.Panic()
 	}
 
 	switch f.state {
 	case stateMovingDown:
-		if f.orderAbove(floor) {
+		if f.orderAbove(currentFloor) {
 			f.transitionToMovingUp()
 		}
 	case stateMovingUp:
-		if !f.orderAbove(floor) {
+		if !f.orderAbove(currentFloor) {
 			f.transitionToMovingDown()
 		}
-	case stateDoorOpen:
-		if floor == targetFloor {
-			f.timer.Reset(doorOpenDuration)
-		}
 
-	case stateDoorClosed:
-		if floor == targetFloor {
+	case stateDoorOpen, stateDoorClosed:
+		if currentFloor == targetFloor {
 			f.transitionToDoorOpen()
-		}
-		if f.orderAbove(floor) {
+		} else if f.orderAbove(currentFloor) {
 			f.transitionToMovingUp()
-		}
-		if !f.orderAbove(floor) {
+		} else {
 			f.transitionToMovingDown()
 		}
 	}
@@ -180,12 +177,10 @@ func (f *fsm) orderAbove(floor int) bool {
 
 
 //Handles events that occur when reaching a new floow
-func (f *fsm) handleAtFloor(floor int) {
+func (f *fsm) handleAtFloor() {
 	switch f.state {
-	case stateMovingUp:
-		fallthrough
-	case stateMovingDown:
-		if f.shouldStop(floor) {
+	case stateMovingUp, stateMovingDown:
+		if f.shouldStop(f.currentFloor) {
 			f.transitionToDoorOpen()
 		}
 	}
@@ -198,7 +193,7 @@ func (f *fsm) transitionToDoorOpen() {
 	f.elevatorCommand <- elevatordriver.OpenDoor
 	f.timer.Reset(doorOpenDuration)
 	f.state = stateDoorOpen
-	f.orderCompleted <- f.currentOrder
+	
 }
 
 
@@ -208,6 +203,7 @@ func (f *fsm) transitionToDoorClosed() {
 	log.Println("Transition to door closed")
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.state = stateDoorClosed
+	f.orderCompleted <- f.currentOrder
 }
 
 
@@ -223,6 +219,7 @@ func (f *fsm) handleTimerElapsed() {
 func (f *fsm) transitionToMovingDown() {
 	log.Println("Transition to moving down")
 	f.elevatorCommand <- elevatordriver.MoveDown
+	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.state = stateMovingDown
 }
 
@@ -230,16 +227,15 @@ func (f *fsm) transitionToMovingDown() {
 func (f *fsm) transitionToMovingUp() {
 	log.Println("Transition to moving up")
 	f.elevatorCommand <- elevatordriver.MoveUp
+	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.state = stateMovingUp
 }
 
 //Initializes elevator when starting up
 func (f *fsm) init(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveUp
-	select {
-		case <- conf.ArrivedAtFloor:
-			f.elevatorCommand <- elevatordriver.Stop
-	}
+	f.currentFloor = <- conf.ArrivedAtFloor
+	f.elevatorCommand <- elevatordriver.Stop
 }
 
 
