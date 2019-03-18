@@ -26,16 +26,14 @@ func RunAtMostOnce(ctx context.Context, conf Config) {
 		log.Panicf("Inconsistent types in AtMostOnce")
 	}
 
+	//Get channel from reflect
+	outChan := reflect.ValueOf(conf.Receive)
+
+	//Create template used for Unmarshalling
 	template := reflect.New(T).Interface()
 	//Launch transmitter and receiver
 	go broadcastTransmitter(ctx, conf.Port, conf.ID, atMostOnceTx)
 	go broadcastReceiver(ctx, conf.Port, conf.ID, atMostOnceRx, template)
-
-	//Create reflect select statement
-	out := reflect.SelectCase{
-		Dir:  reflect.SelectSend,
-		Chan: reflect.ValueOf(conf.Receive),
-	}
 
 	//Wait for completion
 	for {
@@ -43,9 +41,8 @@ func RunAtMostOnce(ctx context.Context, conf Config) {
 		case <-ctx.Done():
 			return
 		case m := <-atMostOnceRx:
-			valuePtr := reflect.ValueOf(m)            //Pointer type
-			out.Send = reflect.Indirect(valuePtr)     //Get actual value
-			reflect.Select([]reflect.SelectCase{out}) //Send on channel
+			valuePtr := reflect.ValueOf(m)           //Pointer type
+			outChan.Send(reflect.Indirect(valuePtr)) //Get actual value
 		}
 
 	}

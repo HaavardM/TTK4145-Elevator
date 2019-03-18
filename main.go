@@ -65,7 +65,7 @@ func main() {
 	atLeastOnceRecv := make(chan string)
 	atMostOnceRecv := make(chan string)
 	nodesOnline := make(chan []int)
-	go utilities.ConstantPublisher(ctx, nodesOnline, []int{1, 2})
+	go utilities.ConstantPublisher(ctx, nodesOnline, []int{1})
 
 	atMostOnceConf := network.Config{
 		Port:    conf.BasePort + TopicNewOrder,
