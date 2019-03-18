@@ -9,7 +9,7 @@ import (
 )
 
 type atMostOnceMsg struct {
-	SenderID int         `json:"sender_id"`
+	SenderID *int        `json:"sender_id"`
 	Data     interface{} `json:"data"`
 }
 
@@ -36,7 +36,7 @@ func RunAtMostOnce(ctx context.Context, conf Config) {
 
 	//Create template used for Unmarshalling
 	template := atMostOnceMsg{
-		SenderID: conf.ID,
+		SenderID: &conf.ID,
 		Data:     reflect.New(T).Interface(),
 	}
 	//Launch transmitter and receiver
@@ -49,8 +49,13 @@ func RunAtMostOnce(ctx context.Context, conf Config) {
 			return
 		case m := <-atMostOnceRx:
 			if v, ok := m.(atMostOnceMsg); ok {
+				if v.Data == nil || v.SenderID == nil {
+					log.Println("Message missing fields")
+				}
 				valuePtr := reflect.ValueOf(v.Data)      //Pointer type
 				outChan.Send(reflect.Indirect(valuePtr)) //Get actual value
+			} else {
+				log.Println("Invalid type")
 			}
 		}
 
