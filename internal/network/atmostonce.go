@@ -8,23 +8,18 @@ import (
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
 
-type atMostOnceMsg struct {
-	SenderID *int        `json:"sender_id"`
-	Data     interface{} `json:"data"`
-}
-
 //RunAtMostOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
 //We use reflection to allow multiple channel types. The network module does not care what the user want to send.
 func RunAtMostOnce(ctx context.Context, conf Config) {
 	//Create channels
-	inChan, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
-	atMostOnceTx := make(chan interface{})
+	atMostOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	if err != nil {
 		log.Panicln("Error starting AtMostOnce: ", err)
 	}
 	atMostOnceRx := make(chan interface{})
 	defer close(atMostOnceRx)
+
 	//Get datatype of send element
 	T := reflect.TypeOf(conf.Send).Elem()
 	if reflect.TypeOf(conf.Receive).Elem() != T {
@@ -35,33 +30,19 @@ func RunAtMostOnce(ctx context.Context, conf Config) {
 	outChan := reflect.ValueOf(conf.Receive)
 
 	//Create template used for Unmarshalling
-	template := atMostOnceMsg{
-		SenderID: &conf.ID,
-		Data:     reflect.New(T).Interface(),
-	}
+	template := reflect.New(T).Interface()
 	//Launch transmitter and receiver
 	go broadcastTransmitter(ctx, conf.Port, conf.ID, atMostOnceTx)
 	go broadcastReceiver(ctx, conf.Port, conf.ID, atMostOnceRx, template)
 
+	//Wait for completion
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case m := <-atMostOnceRx:
-			if v, ok := m.(atMostOnceMsg); ok {
-				if v.Data == nil || v.SenderID == nil {
-					log.Println("Message missing fields")
-				}
-				valuePtr := reflect.ValueOf(v.Data)      //Pointer type
-				outChan.Send(reflect.Indirect(valuePtr)) //Get actual value
-			} else {
-				log.Println("Invalid type")
-			}
-		case m := <-inChan:
-			atMostOnceTx <- atMostOnceMsg{
-				SenderID: &conf.ID,
-				Data:     m,
-			}
+			valuePtr := reflect.ValueOf(m)           //Pointer type
+			outChan.Send(reflect.Indirect(valuePtr)) //Get actual value
 		}
 
 	}

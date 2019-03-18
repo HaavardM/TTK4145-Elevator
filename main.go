@@ -20,6 +20,11 @@ const (
 	TopicCurrentOrders
 )
 
+type Test struct {
+	M string
+	N string
+}
+
 func main() {
 	//Main context
 	ctx := context.Background()
@@ -61,9 +66,9 @@ func main() {
 
 	/*************************TEST CODE***********************/
 	atLeastOnceSend := make(chan string)
-	atMostOnceSend := make(chan string)
+	atMostOnceSend := make(chan Test)
 	atLeastOnceRecv := make(chan string)
-	atMostOnceRecv := make(chan string)
+	atMostOnceRecv := make(chan Test)
 	nodesOnline := make(chan []int)
 	go utilities.ConstantPublisher(ctx, nodesOnline, []int{1})
 
@@ -74,7 +79,7 @@ func main() {
 		Receive: atMostOnceRecv,
 	}
 	go network.RunAtMostOnce(ctx, atMostOnceConf)
-	atLeastOnceConf := network.AtLeastOnceConfig{
+	/*atLeastOnceConf := network.AtLeastOnceConfig{
 		Config: network.Config{
 			Port:    conf.BasePort + TopicOrderComplete,
 			ID:      conf.NetworkID,
@@ -85,16 +90,22 @@ func main() {
 	}
 
 	go network.RunAtLeastOnce(ctx, atLeastOnceConf)
-
-	atLeastOnceSend <- fmt.Sprintf("Hello from %d", conf.NetworkID)
-	atMostOnceSend <- fmt.Sprintf("Hello from %d", conf.NetworkID)
+	*/
+	//atLeastOnceSend <- fmt.Sprintf("Hello from %d", conf.NetworkID)
+	atMostOnceSend <- Test{
+		M: fmt.Sprintf("Hello from %d", conf.NetworkID),
+		N: "N",
+	}
 	for {
 		select {
 		case m := <-atLeastOnceRecv:
 			atLeastOnceSend <- fmt.Sprintf("Hello again ALO from %d", conf.NetworkID)
 			fmt.Println(m)
 		case <-time.After(1 * time.Second):
-			atMostOnceSend <- fmt.Sprintf("Hello again AMO from %d", conf.NetworkID)
+			atMostOnceSend <- Test{
+				M: fmt.Sprintf("Hello again AMO from %d", conf.NetworkID),
+				N: "N",
+			}
 		case m := <-atMostOnceRecv:
 			fmt.Println(m)
 		}
