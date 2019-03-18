@@ -14,6 +14,12 @@ import (
 	"github.com/TTK4145/driver-go/elevio"
 )
 
+const (
+	TopicNewOrder int = iota + 1
+	TopicOrderComplete
+	TopicCurrentOrders
+)
+
 func main() {
 	//Main context
 	ctx := context.Background()
@@ -62,16 +68,15 @@ func main() {
 	go utilities.ConstantPublisher(ctx, nodesOnline, []int{1})
 
 	atMostOnceConf := network.Config{
-		Port:    2000,
+		Port:    conf.BasePort + TopicNewOrder,
 		ID:      1,
 		Send:    atMostOnceSend,
 		Receive: atMostOnceRecv,
 	}
 	go network.RunAtMostOnce(ctx, atMostOnceConf)
-
 	atLeastOnceConf := network.AtLeastOnceConfig{
 		Config: network.Config{
-			Port:    2001,
+			Port:    conf.BasePort + TopicOrderComplete,
 			ID:      1,
 			Send:    atLeastOnceSend,
 			Receive: atLeastOnceRecv,
