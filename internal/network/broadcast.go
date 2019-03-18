@@ -60,7 +60,7 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 		if msg.SenderID == nil {
 			log.Println("Missing fields from json data")
 		} else {
-			if *msg.SenderID == id {
+			if *msg.SenderID != id {
 				message <- msg.Data
 			}
 		}
