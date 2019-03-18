@@ -86,15 +86,15 @@ func main() {
 
 	go network.RunAtLeastOnce(ctx, atLeastOnceConf)
 
-	atLeastOnceSend <- "Hello atLeastOnce"
-	atMostOnceSend <- "Hello atMostOnce"
+	atLeastOnceSend <- fmt.Sprintf("Hello from %d", conf.NetworkID)
+	atMostOnceSend <- fmt.Sprintf("Hello from %d", conf.NetworkID)
 	for {
 		select {
 		case m := <-atLeastOnceRecv:
-			atLeastOnceSend <- "Hello again ALO"
+			atLeastOnceSend <- fmt.Sprintf("Hello again ALO from %d", conf.NetworkID)
 			fmt.Println(m)
 		case <-time.After(1 * time.Second):
-			atMostOnceSend <- "Hello again AMO"
+			atMostOnceSend <- fmt.Sprintf("Hello again AMO from %d", conf.NetworkID)
 		case m := <-atMostOnceRecv:
 			fmt.Println(m)
 		}
