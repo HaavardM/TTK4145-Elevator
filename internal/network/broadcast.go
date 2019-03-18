@@ -44,10 +44,10 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 		}
 
 		//Copy template
-		message := template
+		msg := template
 
 		//Create message template
-		err = json.Unmarshal(buf[0:n], &message)
+		err = json.Unmarshal(buf[0:n], &msg)
 		if err != nil {
 			log.Println("Invalid json format in message")
 		} else {
