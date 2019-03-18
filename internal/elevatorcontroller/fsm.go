@@ -103,18 +103,9 @@ func (f *fsm) test(ctx context.Context, conf Config) {
 	orderCompleted <- firstOrder
 	for {
 		select {
-		case fsm.currentOrder := <-conf.Order:
-			log.Printf("New orders %v\n", orders)
-			fsm.handleNewOrders(orders)
-		case floor := <-conf.ArrivedAtFloor:
-			fsm.handleAtFloor(floor)
-		case <-fsm.timer.C:
-			fsm.handleTimerElapsed()
 		case  <- orderCompleted:
 			secondOrder := Order{DOWN,1}
 			orderCompleted <- secondOrder
-		case <-ctx.Done():
-			break
 		}
 	}
 }
