@@ -3,11 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatorcontroller"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
 	"github.com/TTK4145/driver-go/elevio"
+)
+
+const (
+	TopicNewOrder int = iota + 1
+	TopicOrderComplete
+	TopicCurrentOrders
 )
 
 func main() {
@@ -48,6 +58,45 @@ func main() {
 	go elevatordriver.Run(ctx, elevatorConf)
 	go elevatorcontroller.Run(ctx, controllerConf)
 	go newButtonPressed(ctx, onButtonPress, orders)
+
+	/*************************TEST CODE***********************/
+	atLeastOnceSend := make(chan string)
+	atMostOnceSend := make(chan string)
+	atLeastOnceRecv := make(chan string)
+	atMostOnceRecv := make(chan string)
+	nodesOnline := make(chan []int)
+	go utilities.ConstantPublisher(ctx, nodesOnline, []int{1})
+
+	atMostOnceConf := network.Config{
+		Port:    conf.BasePort + TopicNewOrder,
+		ID:      1,
+		Send:    atMostOnceSend,
+		Receive: atMostOnceRecv,
+	}
+	go network.RunAtMostOnce(ctx, atMostOnceConf)
+	atLeastOnceConf := network.AtLeastOnceConfig{
+		Config: network.Config{
+			Port:    conf.BasePort + TopicOrderComplete,
+			ID:      1,
+			Send:    atLeastOnceSend,
+			Receive: atLeastOnceRecv,
+		},
+		NodesOnline: nodesOnline,
+	}
+
+	go network.RunAtLeastOnce(ctx, atLeastOnceConf)
+
+	atLeastOnceSend <- "Hello atLeastOnce"
+	atMostOnceSend <- "Hello atMostOnce"
+	for {
+		select {
+		case m := <-atLeastOnceRecv:
+			atLeastOnceSend <- "Hello again ALO"
+			fmt.Println(m)
+		case <-time.After(1 * time.Second):
+			atMostOnceSend <- "Hello again AMO"
+		}
+	}
 
 	//Wait for completion
 	<-ctx.Done()
