@@ -4,13 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
 
+type broadcastMsg struct {
+	SenderID int         `json:"sender_id"`
+	Data     interface{} `json:"data"`
+}
+
 //broadcastReceiver receives JSON messages from a UDP broadcast port and unmarshalls into template
-func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, template interface{}) {
+func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, T reflect.Type) {
 	noConn := make(chan error)
 	conn, _, err := createConn(port)
 	defer conn.Close()
@@ -43,15 +49,19 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 			continue
 		}
 
-		//Copy template
-		msg := template
-
 		//Create message template
-		err = json.Unmarshal(buf[0:n], &msg)
+		msg := &broadcastMsg{
+			SenderID: -1,
+			Data:     reflect.New(T).Interface(),
+		}
+		//fmt.Printf("%s\n", buf[0:n])
+		err = json.Unmarshal(buf[0:n], msg)
 		if err != nil {
-			log.Println("Invalid json format in message")
-		} else {
-			message <- msg
+			log.Println(err)
+		}
+
+		if msg.SenderID != id || msg.SenderID < 0 {
+			message <- msg.Data
 		}
 
 	}
@@ -81,7 +91,11 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 		case <-ctx.Done():
 			return
 		case m := <-transmitQueue:
-			data, err := json.Marshal(m)
+			data, err := json.Marshal(broadcastMsg{
+				Data:     m,
+				SenderID: id,
+			},
+			)
 			if err != nil {
 				log.Println("Couldn't marshal message ", err)
 				continue
