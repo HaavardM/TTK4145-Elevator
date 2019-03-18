@@ -9,11 +9,6 @@ import (
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
 
-type broadcastMsg struct {
-	SenderID int         `json:"sender_id"`
-	Data     interface{} `json:"data"`
-}
-
 //broadcastReceiver receives JSON messages from a UDP broadcast port and unmarshalls into template
 func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, template interface{}) {
 	noConn := make(chan error)
@@ -49,13 +44,11 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 		}
 
 		//Create message template
-		msg := broadcastMsg{
-			Data: template,
-		}
-		json.Unmarshal(buf[0:n], &msg)
-
-		if msg.SenderID != id {
-			message <- msg.Data
+		err = json.Unmarshal(buf[0:n], &template)
+		if err != nil {
+			log.Println("Invalid json format in message")
+		} else {
+			message <- template
 		}
 
 	}
@@ -85,11 +78,7 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 		case <-ctx.Done():
 			return
 		case m := <-transmitQueue:
-			data, err := json.Marshal(broadcastMsg{
-				Data:     m,
-				SenderID: id,
-			},
-			)
+			data, err := json.Marshal(m)
 			if err != nil {
 				log.Println("Couldn't marshal message ", err)
 				continue
