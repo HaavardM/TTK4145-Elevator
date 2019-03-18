@@ -30,10 +30,9 @@ func RunAtMostOnce(ctx context.Context, conf Config) {
 	outChan := reflect.ValueOf(conf.Receive)
 
 	//Create template used for Unmarshalling
-	template := reflect.New(T).Interface()
 	//Launch transmitter and receiver
 	go broadcastTransmitter(ctx, conf.Port, conf.ID, atMostOnceTx)
-	go broadcastReceiver(ctx, conf.Port, conf.ID, atMostOnceRx, template)
+	go broadcastReceiver(ctx, conf.Port, conf.ID, atMostOnceRx, T)
 
 	//Wait for completion
 	for {

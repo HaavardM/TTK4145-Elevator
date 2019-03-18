@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
@@ -102,6 +103,7 @@ func main() {
 			atLeastOnceSend <- fmt.Sprintf("Hello again ALO from %d", conf.NetworkID)
 			fmt.Println(m)
 		case <-time.After(1 * time.Second):
+			log.Printf("Sending %d\n", conf.NetworkID)
 			atMostOnceSend <- Test{
 				M: fmt.Sprintf("Hello again AMO from %d", conf.NetworkID),
 				N: "N",

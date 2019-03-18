@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
 
 type broadcastMsg struct {
-	SenderID *int        `json:"sender_id"`
+	SenderID int         `json:"sender_id"`
 	Data     interface{} `json:"data"`
 }
 
 //broadcastReceiver receives JSON messages from a UDP broadcast port and unmarshalls into template
-func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, template interface{}) {
+func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, T reflect.Type) {
 	noConn := make(chan error)
 	conn, _, err := createConn(port)
 	defer conn.Close()
@@ -49,20 +50,18 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 		}
 
 		//Create message template
-		msg := broadcastMsg{
-			Data: template,
+		msg := &broadcastMsg{
+			SenderID: -1,
+			Data:     reflect.New(T).Interface(),
 		}
-		err = json.Unmarshal(buf[0:n], &msg)
+		//fmt.Printf("%s\n", buf[0:n])
+		err = json.Unmarshal(buf[0:n], msg)
 		if err != nil {
 			log.Println(err)
 		}
 
-		if msg.SenderID == nil {
-			log.Println("Missing fields from json data")
-		} else {
-			if *msg.SenderID != id {
-				message <- msg.Data
-			}
+		if msg.SenderID != id || msg.SenderID < 0 {
+			message <- msg.Data
 		}
 
 	}
@@ -94,7 +93,7 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 		case m := <-transmitQueue:
 			data, err := json.Marshal(broadcastMsg{
 				Data:     m,
-				SenderID: &id,
+				SenderID: id,
 			},
 			)
 			if err != nil {
