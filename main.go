@@ -69,7 +69,7 @@ func main() {
 
 	atMostOnceConf := network.Config{
 		Port:    conf.BasePort + TopicNewOrder,
-		ID:      1,
+		ID:      conf.NetworkID,
 		Send:    atMostOnceSend,
 		Receive: atMostOnceRecv,
 	}
@@ -77,7 +77,7 @@ func main() {
 	atLeastOnceConf := network.AtLeastOnceConfig{
 		Config: network.Config{
 			Port:    conf.BasePort + TopicOrderComplete,
-			ID:      1,
+			ID:      conf.NetworkID,
 			Send:    atLeastOnceSend,
 			Receive: atLeastOnceRecv,
 		},
