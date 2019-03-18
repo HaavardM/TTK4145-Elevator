@@ -39,7 +39,9 @@ func main() {
 	elevatorEvents := make(chan elevatordriver.Event)
 	onButtonPress := make(chan elevio.ButtonEvent)
 	lightState := make(chan elevatordriver.LightState)
-	orders := make(chan []elevatorcontroller.Order)
+	order := make(chan elevatorcontroller.Order)
+	orderCompleted := make(chan elevatorcontroller.Order)
+
 
 	//Create elevator configuration
 	elevatorConf := elevatordriver.Config{
@@ -56,14 +58,17 @@ func main() {
 	controllerConf := elevatorcontroller.Config{
 		ElevatorCommand: elevatorCommand,
 		ElevatorEvents:  elevatorEvents,
-		Orders:          orders,
+		Order:          order,
 		ArrivedAtFloor:  arrivedAtFloor,
+		NumberOfFloors:  conf.Floors,
+		OrderCompleted: orderCompleted,
 	}
 
 	//Launch modules
-	go elevatordriver.Run(ctx, elevatorConf)
+	go elevatordriver.Run(ctx, elevatorConf)     
 	go elevatorcontroller.Run(ctx, controllerConf)
-	go newButtonPressed(ctx, onButtonPress, orders)
+	go elevatorcontroller.Test(ctx,controllerConf) ///juliehei
+	go newButtonPressed(ctx, onButtonPress, order)
 
 	/*************************TEST CODE***********************/
 	atLeastOnceSend := make(chan string)
@@ -117,7 +122,7 @@ func main() {
 	<-ctx.Done()
 }
 
-func newButtonPressed(ctx context.Context, onButtonPress <-chan elevio.ButtonEvent, elevatorOrders chan<- []elevatorcontroller.Order) {
+func newButtonPressed(ctx context.Context, onButtonPress <-chan elevio.ButtonEvent, elevatorOrder chan<- elevatorcontroller.Order) {
 	for {
 		select {
 		case b := <-onButtonPress:
@@ -139,7 +144,7 @@ func newButtonPressed(ctx context.Context, onButtonPress <-chan elevio.ButtonEve
 					Floor: b.Floor,
 				}
 			}
-			elevatorOrders <- []elevatorcontroller.Order{order}
+			elevatorOrder <- order
 		case <-ctx.Done():
 			break
 		}
