@@ -12,7 +12,7 @@ read port
 
 start_elevator () {
     sleep 2
-    docker run --network host thefuturezebras/project:$(git rev-parse HEAD) ./main --id=$id --elevator-port=$port
+    docker run --network host thefuturezebras/project:$(git rev-parse HEAD) go run --race main.go --id=$id --elevator-port=$port
 }
 
 start_elevator&

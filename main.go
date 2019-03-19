@@ -75,7 +75,7 @@ func main() {
 
 	atMostOnceConf := network.Config{
 		Port:    conf.BasePort + TopicNewOrder,
-		ID:      conf.NetworkID,
+		ID:      conf.ElevatorID,
 		Send:    atMostOnceSend,
 		Receive: atMostOnceRecv,
 	}
@@ -94,18 +94,18 @@ func main() {
 	*/
 	//atLeastOnceSend <- fmt.Sprintf("Hello from %d", conf.NetworkID)
 	atMostOnceSend <- Test{
-		M: fmt.Sprintf("Hello from %d", conf.NetworkID),
+		M: fmt.Sprintf("Hello from %d", conf.ElevatorID),
 		N: "N",
 	}
 	for {
 		select {
 		case m := <-atLeastOnceRecv:
-			atLeastOnceSend <- fmt.Sprintf("Hello again ALO from %d", conf.NetworkID)
+			atLeastOnceSend <- fmt.Sprintf("Hello again ALO from %d", conf.ElevatorID)
 			fmt.Println(m)
 		case <-time.After(1 * time.Second):
-			log.Printf("Sending %d\n", conf.NetworkID)
+			log.Printf("Sending %d\n", conf.ElevatorID)
 			atMostOnceSend <- Test{
-				M: fmt.Sprintf("Hello again AMO from %d", conf.NetworkID),
+				M: fmt.Sprintf("Hello again AMO from %d", conf.ElevatorID),
 				N: "N",
 			}
 		case m := <-atMostOnceRecv:
