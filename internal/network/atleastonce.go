@@ -17,6 +17,11 @@ type atLeastOnceMsg struct {
 	Data      interface{} `json:"data"`
 }
 
+//IDSet is a set of ids (ints)
+//Implemented as a hashmap
+//Value is an empty struct to save memory (empty structs use no memory)
+type IDSet map[int]struct{}
+
 //AtLeastOnceConfig contains configuration for the atLeastOnce QoS
 type AtLeastOnceConfig struct {
 	Config
@@ -28,7 +33,7 @@ type AtLeastOnceConfig struct {
 func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 
 	//Store received acks for current messages
-	acks := make(map[string]map[int]struct{})
+	acks := make(map[string]IDSet)
 	//Store current publishers with cancel function
 	publishers := make(map[string]func())
 	//Store current alive nodes
@@ -76,7 +81,7 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 			//Create child context - cancellable when all acks received
 			sendCtx, cancel := context.WithCancel(ctx)
 			publishers[msg.MessageID] = cancel
-			acks[msg.MessageID] = make(map[int]struct{})
+			acks[msg.MessageID] = make(IDSet)
 			//Start a new goroutine to send same message at fixed interval
 			go sendUntilDone(sendCtx, msg, bSend, ret)
 		//When a send
@@ -99,8 +104,8 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 		case m := <-bRecv:
 			//Send ack to corresponding goroutine
 			if m.Ack {
-				if d, ok := acks[m.MessageID]; ok {
-					d[m.SenderID] = struct{}{}
+				if idSet, ok := acks[m.MessageID]; ok {
+					idSet[m.SenderID] = struct{}{}
 				} else {
 					log.Println("Received ack for non existent message")
 				}
