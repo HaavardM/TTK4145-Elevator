@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
-
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatorcontroller"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
@@ -72,8 +70,10 @@ func main() {
 	atLeastOnceSend := make(chan string)
 	atLeastOnceRecv := make(chan string)
 	nodesOnline := make(chan []int)
-	go utilities.ConstantPublisher(ctx, nodesOnline, []int{1, 2})
-
+	//go utilities.ConstantPublisher(ctx, nodesOnline, []int{1, 2})
+	go func() {
+		nodesOnline <- []int{1, 2}
+	}()
 	/*atMostOnceConf := network.AtMostOnceConfig{
 		Config: network.Config{
 			Port: conf.BasePort + TopicNewOrder,
