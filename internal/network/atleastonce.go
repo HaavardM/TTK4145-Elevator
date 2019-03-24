@@ -3,9 +3,12 @@ package network
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"reflect"
 	"time"
+
+	"github.com/rs/xid"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
@@ -25,6 +28,8 @@ type IDSet map[int]struct{}
 //AtLeastOnceConfig contains configuration for the atLeastOnce QoS
 type AtLeastOnceConfig struct {
 	Config
+	Send        interface{}
+	Receive     interface{}
 	NodesOnline <-chan []int
 }
 
@@ -38,6 +43,8 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 	publishers := make(map[string]func())
 	//Store current alive nodes
 	nodesOnline := []int{}
+
+	msgCounter := 0
 
 	//Get type of data sent on input/output channel
 	T := reflect.TypeOf(conf.Send).Elem()
@@ -57,11 +64,10 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 	}
 
 	//Start AtMostOnce service
-	c := Config{
+	c := AtMostOnceConfig{
 		Send:    bSend,
 		Receive: bRecv,
-		ID:      conf.ID,
-		Port:    conf.Port,
+		Config:  conf.Config,
 	}
 	go RunAtMostOnce(ctx, c)
 
@@ -72,10 +78,11 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 			return
 		//When a new message is ready to send
 		case m := <-atleastOnceInput:
+			msgCounter++
 			msg := atLeastOnceMsg{
 				Ack:       false,
 				SenderID:  conf.ID,
-				MessageID: "TODO",
+				MessageID: fmt.Sprintf("%s:%d", xid.New().String(), msgCounter),
 				Data:      m,
 			}
 			//Create child context - cancellable when all acks received
@@ -100,24 +107,21 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 			if err != nil {
 				log.Panicln("Failed unmarshal")
 			}
-			recvChan.Send(reflect.Indirect(v))
+			go recvChan.Send(reflect.Indirect(v))
 		case m := <-bRecv:
 			//Send ack to corresponding goroutine
 			if m.Ack {
 				if idSet, ok := acks[m.MessageID]; ok {
 					idSet[m.SenderID] = struct{}{}
 				} else {
-					log.Println("Received ack for non existent message")
+					log.Printf("Received ack for non existent message %v\n", m)
 				}
-			} else if m.SenderID != conf.ID {
+			} else {
 				//Send ACK
 				m.Ack = true
 				m.SenderID = conf.ID
 				bSend <- m
-			} else {
-				//Message from another node
-				//Return the message to client
-				ret <- m
+				go SendMessage(ctx, ret, m)
 			}
 		//Set nodesOnline to updated value
 		case nodesOnline = <-conf.NodesOnline:
@@ -127,6 +131,9 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 		for m, d := range acks {
 			done := true
 			for _, o := range nodesOnline {
+				if o == conf.ID {
+					continue
+				}
 				if _, ok := d[o]; !ok {
 					done = false
 					break
@@ -154,15 +161,17 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 
 //Send until context ends
 func sendUntilDone(ctx context.Context, content atLeastOnceMsg, send chan<- atLeastOnceMsg, ret chan<- atLeastOnceMsg) {
-	timer := time.NewTicker(100 * time.Millisecond)
+	timer := time.NewTicker(1000 * time.Millisecond)
 	defer timer.Stop()
 	//While not received all acks
-	for {
+	done := false
+	for !done {
 		select {
 		case <-ctx.Done():
-			return
+			done = true
 		case <-timer.C:
 			send <- content
 		}
 	}
+	ret <- content
 }

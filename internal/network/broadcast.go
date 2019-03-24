@@ -59,9 +59,8 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 		if err != nil {
 			log.Println(err)
 		}
-
 		if msg.SenderID != id || msg.SenderID < 0 {
-			message <- msg.Data
+			go SendMessage(ctx, message, msg.Data)
 		}
 
 	}
