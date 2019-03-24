@@ -3,10 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
-
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatorcontroller"
@@ -42,7 +39,6 @@ func main() {
 	order := make(chan elevatorcontroller.Order)
 	orderCompleted := make(chan elevatorcontroller.Order)
 
-
 	//Create elevator configuration
 	elevatorConf := elevatordriver.Config{
 		Address:        fmt.Sprintf("localhost:%d", conf.ElevatorPort),
@@ -58,62 +54,54 @@ func main() {
 	controllerConf := elevatorcontroller.Config{
 		ElevatorCommand: elevatorCommand,
 		ElevatorEvents:  elevatorEvents,
-		Order:          order,
+		Order:           order,
 		ArrivedAtFloor:  arrivedAtFloor,
 		NumberOfFloors:  conf.Floors,
-		OrderCompleted: orderCompleted,
+		OrderCompleted:  orderCompleted,
 	}
 
 	//Launch modules
-	go elevatordriver.Run(ctx, elevatorConf)     
+	go elevatordriver.Run(ctx, elevatorConf)
 	go elevatorcontroller.Run(ctx, controllerConf)
-	go elevatorcontroller.Test(ctx,controllerConf) ///juliehei
+	go elevatorcontroller.Test(ctx, controllerConf) ///juliehei
 	go newButtonPressed(ctx, onButtonPress, order)
 
 	/*************************TEST CODE***********************/
 	atLeastOnceSend := make(chan string)
-	atMostOnceSend := make(chan Test)
 	atLeastOnceRecv := make(chan string)
-	atMostOnceRecv := make(chan Test)
 	nodesOnline := make(chan []int)
-	go utilities.ConstantPublisher(ctx, nodesOnline, []int{1})
-
-	atMostOnceConf := network.Config{
-		Port:    conf.BasePort + TopicNewOrder,
-		ID:      conf.ElevatorID,
+	//go utilities.ConstantPublisher(ctx, nodesOnline, []int{1, 2})
+	go func() {
+		nodesOnline <- []int{1, 2}
+	}()
+	/*atMostOnceConf := network.AtMostOnceConfig{
+		Config: network.Config{
+			Port: conf.BasePort + TopicNewOrder,
+			ID:   conf.ElevatorID,
+		},
 		Send:    atMostOnceSend,
 		Receive: atMostOnceRecv,
 	}
 	go network.RunAtMostOnce(ctx, atMostOnceConf)
-	/*atLeastOnceConf := network.AtLeastOnceConfig{
+	*/
+	atLeastOnceConf := network.AtLeastOnceConfig{
 		Config: network.Config{
-			Port:    conf.BasePort + TopicOrderComplete,
-			ID:      conf.NetworkID,
-			Send:    atLeastOnceSend,
-			Receive: atLeastOnceRecv,
+			Port: conf.BasePort + TopicOrderComplete,
+			ID:   conf.ElevatorID,
 		},
+		Send:        atLeastOnceSend,
+		Receive:     atLeastOnceRecv,
 		NodesOnline: nodesOnline,
 	}
 
 	go network.RunAtLeastOnce(ctx, atLeastOnceConf)
-	*/
 	//atLeastOnceSend <- fmt.Sprintf("Hello from %d", conf.NetworkID)
-	atMostOnceSend <- Test{
-		M: fmt.Sprintf("Hello from %d", conf.ElevatorID),
-		N: "N",
-	}
+	atLeastOnceSend <- "HeiPåDeg"
 	for {
 		select {
 		case m := <-atLeastOnceRecv:
 			atLeastOnceSend <- fmt.Sprintf("Hello again ALO from %d", conf.ElevatorID)
-			fmt.Println(m)
-		case <-time.After(1 * time.Second):
-			log.Printf("Sending %d\n", conf.ElevatorID)
-			atMostOnceSend <- Test{
-				M: fmt.Sprintf("Hello again AMO from %d", conf.ElevatorID),
-				N: "N",
-			}
-		case m := <-atMostOnceRecv:
+			<-time.After(time.Second)
 			fmt.Println(m)
 		}
 	}

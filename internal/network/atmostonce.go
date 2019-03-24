@@ -8,10 +8,19 @@ import (
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
 
+//AtMostOnceConfig is a configuration struct used to configure atMostOnce
+type AtMostOnceConfig struct {
+	Config
+	//Send is the channel used to send data to the network. Must be of same type as Recv
+	Send interface{}
+	//Receive is the channel used to receive data from the network. Must be of same type as Send
+	Receive interface{}
+}
+
 //RunAtMostOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
 //We use reflection to allow multiple channel types. The network module does not care what the user want to send.
-func RunAtMostOnce(ctx context.Context, conf Config) {
+func RunAtMostOnce(ctx context.Context, conf AtMostOnceConfig) {
 	//Create channels
 	atMostOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	if err != nil {
