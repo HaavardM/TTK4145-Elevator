@@ -157,6 +157,9 @@ func findHighestPriority(orders *schedOrders, cost elevatorCost, id int) *Schedu
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
 	for _, order := range orders.ordersCab {
+		if order.Assignee != id {
+			continue
+		}
 		orderCost := cost.Cab[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
@@ -164,6 +167,9 @@ func findHighestPriority(orders *schedOrders, cost elevatorCost, id int) *Schedu
 		}
 	}
 	for _, order := range orders.ordersDown {
+		if order.Assignee != id {
+			continue
+		}
 		orderCost := cost.Down[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
@@ -171,6 +177,9 @@ func findHighestPriority(orders *schedOrders, cost elevatorCost, id int) *Schedu
 		}
 	}
 	for _, order := range orders.ordersUp {
+		if order.Assignee != id {
+			continue
+		}
 		orderCost := cost.Up[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
