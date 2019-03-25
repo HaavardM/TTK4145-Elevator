@@ -48,6 +48,11 @@ const (
 	NoDirection
 )
 
+type Elevatorstatus struct {
+	ElevatorDir		Direction
+	ElevatorFloor	int
+}
+
 func (d Direction) String() string {
 	switch d {
 	case UP:
