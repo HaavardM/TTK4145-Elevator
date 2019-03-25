@@ -12,9 +12,10 @@ read port
 
 start_elevator () {
     sleep 2
-    docker run --network host thefuturezebras/project:$(git rev-parse HEAD) go run --race main.go --id=$id --elevator-port=$port
+    go run --race ../main.go --id=$id --elevator-port=$port
 }
 
 start_elevator&
 ./SimElevatorServer --port=$port
+docker kill $(docker ps -a -q)
 
