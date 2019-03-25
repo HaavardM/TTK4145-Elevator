@@ -8,6 +8,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
+
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 	"github.com/TTK4145/driver-go/elevio"
@@ -38,9 +40,9 @@ type Config struct {
 }
 
 type schedOrders struct {
-	ordersUp   []*SchedulableOrder
-	ordersDown []*SchedulableOrder
-	ordersCab  []*SchedulableOrder
+	OrdersUp   []*SchedulableOrder `json:"orders_up"`
+	OrdersDown []*SchedulableOrder `json:"orders_down"`
+	OrdersCab  []*SchedulableOrder `json:"orders_cab"`
 }
 
 type elevatorCost struct {
@@ -53,25 +55,28 @@ type elevatorCost struct {
 //The ctx context is used to stop the gorotine if the context expires.
 func Run(ctx context.Context, conf Config) {
 	orders := schedOrders{
-		ordersUp:   make([]*SchedulableOrder, conf.NumFloors-1),
-		ordersDown: make([]*SchedulableOrder, conf.NumFloors-1),
-		ordersCab:  make([]*SchedulableOrder, conf.NumFloors),
+		OrdersUp:   make([]*SchedulableOrder, conf.NumFloors-1),
+		OrdersDown: make([]*SchedulableOrder, conf.NumFloors-1),
+		OrdersCab:  make([]*SchedulableOrder, conf.NumFloors),
 	}
 	timer := time.NewTicker(time.Second)
 	elevatorCosts := make(map[int]elevatorCost)
+	sysConf := configuration.GetConfig()
 
 	for {
 		select {
 		case <-ctx.Done():
+			//Delete orders file on clean exit
+			deleteOrdersFile(sysConf.FolderPath)
 			return
 
 		case <-timer.C:
-			toSend := make([]SchedulableOrder, 0, len(orders.ordersDown)+len(orders.ordersUp))
-			for _, o := range orders.ordersDown {
+			toSend := make([]SchedulableOrder, 0, len(orders.OrdersDown)+len(orders.OrdersUp))
+			for _, o := range orders.OrdersDown {
 				toSend = append(toSend, *o)
 			}
 
-			for _, o := range orders.ordersUp {
+			for _, o := range orders.OrdersUp {
 				toSend = append(toSend, *o)
 			}
 			conf.CurrentOrdersSend <- toSend
@@ -80,15 +85,15 @@ func Run(ctx context.Context, conf Config) {
 		case order := <-conf.OrderCompletedRecv:
 			switch order.Dir {
 			case common.UpDir:
-				if err := tryRemoveOrderFromSlice(orders.ordersUp, order.Floor); err != nil {
+				if err := tryRemoveOrderFromSlice(orders.OrdersUp, order.Floor); err != nil {
 					log.Println("Error removing order: ", err)
 				}
 			case common.DownDir:
-				if err := tryRemoveOrderFromSlice(orders.ordersDown, order.Floor-1); err != nil {
+				if err := tryRemoveOrderFromSlice(orders.OrdersDown, order.Floor-1); err != nil {
 					log.Println("Error removing order: ", err)
 				}
 			case common.NoDir:
-				if err := tryRemoveOrderFromSlice(orders.ordersCab, order.Floor); err != nil {
+				if err := tryRemoveOrderFromSlice(orders.OrdersCab, order.Floor); err != nil {
 					log.Println("Error removing order: ", err)
 				}
 			}
@@ -96,16 +101,16 @@ func Run(ctx context.Context, conf Config) {
 			switch order.Dir {
 			case common.NoDir:
 				//Clear orders
-				orders.ordersCab[order.Floor] = nil
+				orders.OrdersCab[order.Floor] = nil
 			case common.DownDir:
-				schedOrder := orders.ordersDown[order.Floor-1]
+				schedOrder := orders.OrdersDown[order.Floor-1]
 				if schedOrder != nil {
 					conf.OrderCompletedSend <- *schedOrder
 				} else {
 					log.Println("Unexpected order completed")
 				}
 			case common.UpDir:
-				schedOrder := orders.ordersUp[order.Floor]
+				schedOrder := orders.OrdersUp[order.Floor]
 				if schedOrder != nil {
 					conf.OrderCompletedSend <- *schedOrder
 				} else {
@@ -118,8 +123,8 @@ func Run(ctx context.Context, conf Config) {
 		case btn := <-conf.ButtonPressed:
 			switch btn.Button {
 			case elevio.BT_Cab:
-				if orders.ordersCab[btn.Floor] == nil {
-					orders.ordersCab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
+				if orders.OrdersCab[btn.Floor] == nil {
+					orders.OrdersCab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
 				}
 			case elevio.BT_HallDown:
 				order := createOrder(btn.Floor, common.DownDir, selectAssignee(nil, btn.Floor, common.DownDir))
@@ -133,15 +138,19 @@ func Run(ctx context.Context, conf Config) {
 		}
 
 		//TODO Save orders to file
+		err := savetofile(sysConf.FolderPath, &orders)
+		if err != nil {
+			log.Panic(err)
+		}
 
 		//Set order lights
-		for _, order := range orders.ordersUp {
+		for _, order := range orders.OrdersUp {
 			conf.Lights <- elevatordriver.LightState{Floor: order.Floor, Type: elevatordriver.UpButtonLight, State: (order != nil)}
 		}
-		for _, order := range orders.ordersDown {
+		for _, order := range orders.OrdersDown {
 			conf.Lights <- elevatordriver.LightState{Floor: order.Floor, Type: elevatordriver.DownButtonLight, State: (order != nil)}
 		}
-		for _, order := range orders.ordersCab {
+		for _, order := range orders.OrdersCab {
 			conf.Lights <- elevatordriver.LightState{Floor: order.Floor, Type: elevatordriver.InternalButtonLight, State: (order != nil)}
 		}
 
@@ -159,7 +168,7 @@ func selectAssignee(assignees map[int][]int, floor int, dir common.Direction) in
 func findHighestPriority(orders *schedOrders, cost elevatorCost, id int) *SchedulableOrder {
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
-	for _, order := range orders.ordersCab {
+	for _, order := range orders.OrdersCab {
 		if order.Assignee != id {
 			continue
 		}
@@ -169,7 +178,7 @@ func findHighestPriority(orders *schedOrders, cost elevatorCost, id int) *Schedu
 			currOrder = order
 		}
 	}
-	for _, order := range orders.ordersDown {
+	for _, order := range orders.OrdersDown {
 		if order.Assignee != id {
 			continue
 		}
@@ -179,7 +188,7 @@ func findHighestPriority(orders *schedOrders, cost elevatorCost, id int) *Schedu
 			currOrder = order
 		}
 	}
-	for _, order := range orders.ordersUp {
+	for _, order := range orders.OrdersUp {
 		if order.Assignee != id {
 			continue
 		}
@@ -209,15 +218,15 @@ func createOrder(floor int, dir common.Direction, assignee int) *SchedulableOrde
 func handleNewOrder(orders *schedOrders, order SchedulableOrder) error {
 	switch order.Dir {
 	case common.UpDir:
-		if err := tryAddOrderToSlice(orders.ordersUp, order.Floor, order); err != nil {
+		if err := tryAddOrderToSlice(orders.OrdersUp, order.Floor, order); err != nil {
 			return err
 		}
 	case common.DownDir:
-		if err := tryAddOrderToSlice(orders.ordersDown, order.Floor-1, order); err != nil {
+		if err := tryAddOrderToSlice(orders.OrdersDown, order.Floor-1, order); err != nil {
 			return err
 		}
 	case common.NoDir:
-		if err := tryAddOrderToSlice(orders.ordersDown, order.Floor, order); err != nil {
+		if err := tryAddOrderToSlice(orders.OrdersDown, order.Floor, order); err != nil {
 			return err
 		}
 	default:
