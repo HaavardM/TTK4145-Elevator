@@ -75,6 +75,7 @@ type Config struct {
 	ArrivedAtFloor  <-chan int
 	NumberOfFloors int 
 	OrderCompleted chan Order
+	ElevatorInfo chan<- Elevatorstatus		//Blir dette riktig?? Er det en scheduler eller en elevatorcontroller?
 }
 
 type fsm struct {
@@ -121,7 +122,7 @@ func Run(ctx context.Context, conf Config) {
 	log.Println("done")
 	for {
 		select {
-		case fsm.currentOrder = <-conf.Order:							//fsm.currentOrder 
+		case fsm.currentOrder = <-conf.Order:
 			log.Printf("New orders %v\n", fsm.currentOrder)
 			fsm.handleNewOrders(conf)
 		case fsm.currentFloor = <-conf.ArrivedAtFloor:
@@ -177,7 +178,9 @@ func (f *fsm) orderAbove(floor int) bool {
 
 
 //Handles events that occur when reaching a new floow
-func (f *fsm) handleAtFloor() {
+func (f *fsm) handleAtFloor(conf Config, elevstat Elevatorstatus) {				//julie
+	elevstat.ElevatorFloor = f.currentFloor
+	conf.ElevatorInfo <- elevstat
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
 		if f.shouldStop(f.currentFloor) {
@@ -216,18 +219,23 @@ func (f *fsm) handleTimerElapsed() {
 }
 
 //handles transition from one state to moving down
-func (f *fsm) transitionToMovingDown() {
+func (f *fsm) transitionToMovingDown(conf Config, elevstat Elevatorstatus) {							//julie
 	log.Println("Transition to moving down")
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
+	elevstat.ElevatorDir = DOWN
+	conf.ElevatorInfo <- elevstat
+	fmt.Println(elevstat)
 	f.state = stateMovingDown
 }
 
 //Handles transition from one state to moving up
-func (f *fsm) transitionToMovingUp() {
+func (f *fsm) transitionToMovingUp(conf Config, elevstat Elevatorstatus) {								//julie
 	log.Println("Transition to moving up")
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
+	elevstat.ElevatorDir = UP
+	conf.ElevatorInfo <- elevstat
 	f.state = stateMovingUp
 }
 
