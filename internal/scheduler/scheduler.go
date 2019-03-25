@@ -67,6 +67,15 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		},
 	}
 
+	//Load orders if file exists
+	if fileExists(conf.FolderPath) {
+		tmp, err := readFromOrdersFile(conf.FolderPath)
+		if err != nil {
+			log.Panicf("Error reading from file: %s\n", err)
+		}
+		orders = *tmp
+	}
+
 	//Load system configuration
 	for {
 		select {
@@ -122,8 +131,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			}
 		}
 
-		//TODO Save orders to file
-		err := savetofile(conf.FolderPath, &orders)
+		//Save orders to file
+		err := saveToOrdersFile(conf.FolderPath, &orders)
 		if err != nil {
 			log.Panic(err)
 		}

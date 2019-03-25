@@ -57,6 +57,9 @@ func RunAtLeastOnce(ctx context.Context, waitGroup *sync.WaitGroup, conf AtLeast
 	bSend := make(chan atLeastOnceMsg)
 	bRecv := make(chan atLeastOnceMsg)
 	ret := make(chan atLeastOnceMsg)
+	defer close(bSend)
+	defer close(bRecv)
+	defer close(ret)
 	//Get input channel as a type agnostic interface channel
 	atleastOnceInput, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	recvChan := reflect.ValueOf(conf.Receive)

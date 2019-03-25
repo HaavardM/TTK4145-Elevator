@@ -14,6 +14,7 @@ func ReflectChan2InterfaceChan(ctx context.Context, r reflect.Value) (<-chan int
 		return nil, errors.New("Input value is not a channel type")
 	}
 	c := make(chan interface{})
+	defer close(c)
 	go func() {
 		done := false
 		for !done {
@@ -28,8 +29,6 @@ func ReflectChan2InterfaceChan(ctx context.Context, r reflect.Value) (<-chan int
 				done = true
 			}
 		}
-		//clean up resources
-		close(c)
 	}()
 	return c, nil
 }
@@ -39,6 +38,7 @@ func RChan2RWChan(ctx context.Context, inChan <-chan interface{}) chan interface
 	outChan := make(chan interface{})
 	go func() {
 		running := true
+		defer close(outChan)
 		for running {
 			select {
 			case <-ctx.Done():
@@ -48,7 +48,6 @@ func RChan2RWChan(ctx context.Context, inChan <-chan interface{}) chan interface
 				running = ok
 			}
 		}
-		close(outChan)
 	}()
 	return outChan
 }

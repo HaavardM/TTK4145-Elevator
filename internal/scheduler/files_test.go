@@ -45,11 +45,11 @@ func TestSaveRead(t *testing.T) {
 	}
 	//go scheduler.savetofile(FilePath, orders)
 	//go scheduler.readfromfile(FilePath)
-	err := savetofile(FilePath, &orders)
+	err := saveToOrdersFile(FilePath, &orders)
 	if err != nil {
 		t.Error(err)
 	}
-	x, err := readfromfile(FilePath)
+	x, err := readFromOrdersFile(FilePath)
 	if err != nil {
 		t.Error(err)
 	}

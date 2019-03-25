@@ -22,6 +22,7 @@ func broadcastReceiver(ctx context.Context, waitGroup *sync.WaitGroup, port int,
 	//Defer is stack based - last-in-first-out
 	defer waitGroup.Done()
 	noConn := make(chan error)
+	defer close(noConn)
 	conn, _, err := createConn(port)
 	//Close connection on exit
 	defer conn.Close()
