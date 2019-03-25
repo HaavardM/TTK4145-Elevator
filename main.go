@@ -38,7 +38,7 @@ func main() {
 	lightState := make(chan elevatordriver.LightState)
 	order := make(chan elevatorcontroller.Order)
 	orderCompleted := make(chan elevatorcontroller.Order)
-	elevatorInfo := make(chan elevatorcontroller.Elevatorstatus)					//julie
+	elevatorInfo := make(chan common.Elevatorstatus)					//julie
 
 	//Create elevator configuration
 	elevatorConf := elevatordriver.Config{
