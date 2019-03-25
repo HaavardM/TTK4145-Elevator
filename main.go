@@ -3,20 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
+	"log"
+	"os"
+	"os/signal"
 
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
+
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatorcontroller"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/scheduler"
 	"github.com/TTK4145/driver-go/elevio"
 )
 
 const (
 	TopicNewOrder int = iota + 1
 	TopicOrderComplete
-	TopicCurrentOrders
 )
 
 type Test struct {
@@ -26,7 +29,7 @@ type Test struct {
 
 func main() {
 	//Main context
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	//Get configration
 	conf := configuration.GetConfig()
@@ -34,12 +37,19 @@ func main() {
 	//Create neccessary channels for the elevator
 	arrivedAtFloor := make(chan int)
 	elevatorCommand := make(chan elevatordriver.Command)
-	elevatorEvents := make(chan elevatordriver.Event)
 	onButtonPress := make(chan elevio.ButtonEvent)
 	lightState := make(chan elevatordriver.LightState)
 	order := make(chan common.Order)
 	orderCompleted := make(chan common.Order)
-	elevatorInfo := make(chan common.Elevatorstatus)					//julie
+	elevatorInfo := make(chan common.ElevatorStatus) //julie
+
+	topicNewOrderSend := make(chan scheduler.SchedulableOrder)
+	topicNewOrderRecv := make(chan scheduler.SchedulableOrder)
+	topicOrderCompleteSend := make(chan scheduler.SchedulableOrder)
+	topicOrderCompleteRecv := make(chan scheduler.SchedulableOrder)
+
+	costSend := make(chan common.OrderCosts)
+	costRecv := make(chan common.OrderCosts)
 
 	//Create elevator configuration
 	elevatorConf := elevatordriver.Config{
@@ -47,7 +57,6 @@ func main() {
 		NumberOfFloors: conf.Floors,
 		ArrivedAtFloor: arrivedAtFloor,
 		Commands:       elevatorCommand,
-		Events:         elevatorEvents,
 		OnButtonPress:  onButtonPress,
 		SetStatusLight: lightState,
 	}
@@ -55,89 +64,77 @@ func main() {
 	//Create elevator controller configuration
 	controllerConf := elevatorcontroller.Config{
 		ElevatorCommand: elevatorCommand,
-		ElevatorEvents:  elevatorEvents,
 		Order:           order,
 		ArrivedAtFloor:  arrivedAtFloor,
 		NumberOfFloors:  conf.Floors,
-		OrderCompleted:  orderCompleted,	
-		ElevatorInfo:	elevatorInfo,									//julie 
+		OrderCompleted:  orderCompleted,
+		ElevatorInfo:    elevatorInfo, //julie
+	}
+
+	newOrderNodesOnline := make(chan []int)
+	topicNewOrderConf := network.AtLeastOnceConfig{
+		Config: network.Config{
+			Port: conf.BasePort + TopicNewOrder,
+			ID:   conf.ElevatorID,
+		},
+		Send:        topicNewOrderSend,
+		Receive:     topicNewOrderRecv,
+		NodesOnline: newOrderNodesOnline,
+	}
+
+	orderCompletedNodesOnline := make(chan []int)
+	topicOrderCompletedConf := network.AtLeastOnceConfig{
+		Config: network.Config{
+			Port: conf.BasePort + TopicOrderComplete,
+			ID:   conf.ElevatorID,
+		},
+		Send:        topicOrderCompleteSend,
+		Receive:     topicOrderCompleteRecv,
+		NodesOnline: orderCompletedNodesOnline,
+	}
+
+	schedulerConf := scheduler.Config{
+		NumFloors:          conf.Floors,
+		NewOrderRecv:       topicNewOrderRecv,
+		NewOrderSend:       topicNewOrderSend,
+		OrderCompletedRecv: topicOrderCompleteRecv,
+		OrderCompletedSend: topicOrderCompleteSend,
+		ElevStatus:         elevatorInfo,
+		ElevatorID:         conf.ElevatorID,
+		ElevButtonPressed:  onButtonPress,
+		ElevCompletedOrder: orderCompleted,
+		Lights:             lightState,
+		CostsSend:          costSend,
+		CostsRecv:          costRecv,
+		ElevExecuteOrder:   order,
+		FolderPath:         conf.FolderPath,
 	}
 
 	//Launch modules
 	go elevatordriver.Run(ctx, elevatorConf)
 	go elevatorcontroller.Run(ctx, controllerConf)
-	go elevatorcontroller.Test(ctx, controllerConf) 				///juliehei
-	go newButtonPressed(ctx, onButtonPress, order)
+	go network.RunAtLeastOnce(ctx, topicNewOrderConf)
+	go network.RunAtLeastOnce(ctx, topicOrderCompletedConf)
+	go scheduler.Run(ctx, schedulerConf)
 
-	/*************************TEST CODE***********************/
-	atLeastOnceSend := make(chan string)
-	atLeastOnceRecv := make(chan string)
-	nodesOnline := make(chan []int)
-	//go utilities.ConstantPublisher(ctx, nodesOnline, []int{1, 2})
 	go func() {
-		nodesOnline <- []int{1, 2}
+		newOrderNodesOnline <- []int{1, 2}
+		orderCompletedNodesOnline <- []int{1, 2}
 	}()
-	/*atMostOnceConf := network.AtMostOnceConfig{
-		Config: network.Config{
-			Port: conf.BasePort + TopicNewOrder,
-			ID:   conf.ElevatorID,
-		},
-		Send:    atMostOnceSend,
-		Receive: atMostOnceRecv,
-	}
-	go network.RunAtMostOnce(ctx, atMostOnceConf)
-	*/
-	atLeastOnceConf := network.AtLeastOnceConfig{
-		Config: network.Config{
-			Port: conf.BasePort + TopicOrderComplete,
-			ID:   conf.ElevatorID,
-		},
-		Send:        atLeastOnceSend,
-		Receive:     atLeastOnceRecv,
-		NodesOnline: nodesOnline,
-	}
 
-	go network.RunAtLeastOnce(ctx, atLeastOnceConf)
-	//atLeastOnceSend <- fmt.Sprintf("Hello from %d", conf.NetworkID)
-	atLeastOnceSend <- "HeiPåDeg"
-	for {
-		select {
-		case m := <-atLeastOnceRecv:
-			atLeastOnceSend <- fmt.Sprintf("Hello again ALO from %d", conf.ElevatorID)
-			<-time.After(time.Second)
-			fmt.Println(m)
-		}
-	}
-
-	//Wait for completion
+	//Handle signals to get a graceful shutdown
+	sig := make(chan os.Signal)
+	go handleSignals(sig, cancel)
+	signal.Notify(sig, os.Interrupt, os.Kill)
+	//Wait for shutdown
 	<-ctx.Done()
+
 }
 
-func newButtonPressed(ctx context.Context, onButtonPress <-chan elevio.ButtonEvent, elevatorOrder chan<- common.Order) {
-	for {
-		select {
-		case b := <-onButtonPress:
-			order := common.Order{}
-			switch b.Button {
-			case elevio.BT_HallDown:
-				order = common.Order{
-					Dir:   common.DownDir,
-					Floor: b.Floor,
-				}
-			case elevio.BT_HallUp:
-				order = common.Order{
-					Dir:   common.UpDir,
-					Floor: b.Floor,
-				}
-			case elevio.BT_Cab:
-				order = common.Order{
-					Dir:   common.NoDir,
-					Floor: b.Floor,
-				}
-			}
-			elevatorOrder <- order
-		case <-ctx.Done():
-			break
-		}
+func handleSignals(sig <-chan os.Signal, cancelCtx func()) {
+	if cancelCtx == nil {
+		log.Panicln("Invalid cancel function")
 	}
+	<-sig
+	cancelCtx()
 }

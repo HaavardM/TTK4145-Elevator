@@ -2,12 +2,12 @@ package elevatorcontroller
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
-	"fmt"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 )
 
 const (
@@ -78,30 +78,30 @@ type Order struct {
 type Config struct {
 	ElevatorCommand chan<- elevatordriver.Command
 	ElevatorEvents  <-chan elevatordriver.Event
-	Order         chan common.Order 			//common.Order
+	Order           chan common.Order //common.Order
 	ArrivedAtFloor  <-chan int
-	NumberOfFloors int 
-	OrderCompleted chan common.Order 			//common.Order
-	ElevatorInfo chan<- common.Elevatorstatus
+	NumberOfFloors  int
+	OrderCompleted  chan common.Order //common.Order
+	ElevatorInfo    chan<- common.ElevatorStatus
 }
 
 type fsm struct {
 	state           state
 	timer           *time.Timer
 	elevatorCommand chan<- elevatordriver.Command
-	currentOrder	common.Order 				//common.Order
-	orderCompleted 	chan<- common.Order 		//common.Order
-	status common.Elevatorstatus
+	currentOrder    *common.Order       //common.Order
+	orderCompleted  chan<- common.Order //common.Order
+	status          common.ElevatorStatus
 }
 
-const doorOpenDuration = 3*time.Second
+const doorOpenDuration = 3 * time.Second
 
-func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<-common.Order) *fsm {
+func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<- common.Order) *fsm {
 	temp := &fsm{
 		state:           stateDoorClosed,
 		timer:           time.NewTimer(doorOpenDuration),
 		elevatorCommand: elevatorCommand,
-		orderCompleted: orderCompleted,
+		orderCompleted:  orderCompleted,
 	}
 	if !(temp.timer.Stop()) {
 		<-temp.timer.C
@@ -114,8 +114,8 @@ func Test(ctx context.Context, conf Config) {
 	conf.Order <- firstOrder
 	for {
 		select {
-		case  <-conf.OrderCompleted:
-			secondOrder := common.Order{common.DownDir,1}
+		case <-conf.OrderCompleted:
+			secondOrder := common.Order{common.DownDir, 1}
 			conf.Order <- secondOrder
 		}
 	}
@@ -129,7 +129,8 @@ func Run(ctx context.Context, conf Config) {
 	log.Println("done")
 	for {
 		select {
-		case fsm.currentOrder = <-conf.Order:
+		case order := <-conf.Order:
+			fsm.currentOrder = &order
 			log.Printf("New orders %v\n", fsm.currentOrder)
 			fsm.handleNewOrders(conf)
 		case fsm.status.Floor = <-conf.ArrivedAtFloor:
@@ -142,9 +143,13 @@ func Run(ctx context.Context, conf Config) {
 	}
 }
 
-
 //Handles incomming orders from the scheduler module
 func (f *fsm) handleNewOrders(conf Config) {
+
+	if f.currentOrder == nil {
+		return
+	}
+
 	targetFloor := f.currentOrder.Floor
 	currentFloor := f.status.Floor
 	targetDir := f.currentOrder.Dir
@@ -183,9 +188,8 @@ func (f *fsm) orderAbove(floor int) bool {
 	return false
 }
 
-
 //Handles events that occur when reaching a new floow
-func (f *fsm) handleAtFloor(conf Config) {				//julie
+func (f *fsm) handleAtFloor(conf Config) { //julie
 	conf.ElevatorInfo <- f.status
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
@@ -202,19 +206,19 @@ func (f *fsm) transitionToDoorOpen() {
 	f.elevatorCommand <- elevatordriver.OpenDoor
 	f.timer.Reset(doorOpenDuration)
 	f.state = stateDoorOpen
-	
+
 }
-
-
 
 //Handles transition from one state to door closed
 func (f *fsm) transitionToDoorClosed() {
 	log.Println("Transition to door closed")
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.state = stateDoorClosed
-	f.orderCompleted <- f.currentOrder
+	if f.currentOrder != nil {
+		f.orderCompleted <- *f.currentOrder
+		f.currentOrder = nil
+	}
 }
-
 
 //Handles events when door-open-timer has elapsed
 func (f *fsm) handleTimerElapsed() {
@@ -225,7 +229,7 @@ func (f *fsm) handleTimerElapsed() {
 }
 
 //handles transition from one state to moving down
-func (f *fsm) transitionToMovingDown(conf Config) {							//julie
+func (f *fsm) transitionToMovingDown(conf Config) { //julie
 	log.Println("Transition to moving down")
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
@@ -236,26 +240,27 @@ func (f *fsm) transitionToMovingDown(conf Config) {							//julie
 }
 
 //Handles transition from one state to moving up
-func (f *fsm) transitionToMovingUp(conf Config) {								//julie
+func (f *fsm) transitionToMovingUp(conf Config) { //julie
 	log.Println("Transition to moving up")
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.UpDir
+	log.Println("Start")
 	conf.ElevatorInfo <- f.status
+	log.Println("End")
 	f.state = stateMovingUp
 }
 
 //Initializes elevator when starting up
 func (f *fsm) init(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveUp
-	f.status.Floor = <- conf.ArrivedAtFloor
+	f.status.Floor = <-conf.ArrivedAtFloor
 	f.elevatorCommand <- elevatordriver.Stop
 }
 
-
 //Checks if we have reached target floor or not
 func (f *fsm) shouldStop(floor int) bool {
-	if floor == f.currentOrder.Floor {
+	if f.currentOrder == nil || floor == f.currentOrder.Floor {
 		return true
 	}
 	return false

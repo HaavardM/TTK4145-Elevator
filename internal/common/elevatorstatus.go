@@ -1,7 +1,7 @@
 package common
 
-
-type Elevatorstatus struct {
-	Dir		Direction
-	Floor	int
+//ElevatorStatus contains information about the current status of the elevator
+type ElevatorStatus struct {
+	Dir   Direction
+	Floor int
 }
