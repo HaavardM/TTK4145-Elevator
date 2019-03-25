@@ -38,6 +38,7 @@ func main() {
 	lightState := make(chan elevatordriver.LightState)
 	order := make(chan elevatorcontroller.Order)
 	orderCompleted := make(chan elevatorcontroller.Order)
+	elevatorInfo := make(chan elevatorcontroller.Elevatorstatus)					//julie
 
 	//Create elevator configuration
 	elevatorConf := elevatordriver.Config{
@@ -57,13 +58,14 @@ func main() {
 		Order:           order,
 		ArrivedAtFloor:  arrivedAtFloor,
 		NumberOfFloors:  conf.Floors,
-		OrderCompleted:  orderCompleted,
+		OrderCompleted:  orderCompleted,	
+		ElevatorInfo:	elevatorInfo,									//julie 
 	}
 
 	//Launch modules
 	go elevatordriver.Run(ctx, elevatorConf)
 	go elevatorcontroller.Run(ctx, controllerConf)
-	go elevatorcontroller.Test(ctx, controllerConf) ///juliehei
+	go elevatorcontroller.Test(ctx, controllerConf) 				///juliehei
 	go newButtonPressed(ctx, onButtonPress, order)
 
 	/*************************TEST CODE***********************/
