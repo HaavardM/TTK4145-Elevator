@@ -19,5 +19,5 @@ func (d Direction) String() string {
 	case NoDir:
 		return "NoDir"
 	}
-	return fmt.Sprint(d)
+	return fmt.Sprintf("%d", d)
 }
