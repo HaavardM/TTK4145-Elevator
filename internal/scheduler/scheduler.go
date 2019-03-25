@@ -22,6 +22,11 @@ type SchedulableOrder struct {
 	Timestamp    time.Time `json:"timestamp"`
 }
 
+type ElevatorStatus struct {
+	Floor int
+	Dir   common.Direction
+}
+
 //Config contains scheduler configuration variables
 type Config struct {
 	ElevatorID         int
@@ -35,6 +40,7 @@ type Config struct {
 	OrderCompletedRecv <-chan SchedulableOrder
 	CostsSend          chan<- common.OrderCosts
 	CostsRecv          <-chan common.OrderCosts
+	ElevatorStatus     <-chan ElevatorStatus
 
 	NumFloors int
 }
@@ -50,14 +56,17 @@ type schedOrders struct {
 func Run(ctx context.Context, conf Config) {
 	//Contains orders for all floors and directions
 	orders := schedOrders{
-		OrdersUp:   make([]*SchedulableOrder, conf.NumFloors-1),
-		OrdersDown: make([]*SchedulableOrder, conf.NumFloors-1),
+		OrdersUp:   make([]*SchedulableOrder, conf.NumFloors),
+		OrdersDown: make([]*SchedulableOrder, conf.NumFloors),
 		OrdersCab:  make([]*SchedulableOrder, conf.NumFloors),
 	}
+	//Contains the cost for orders to all floor by all elevators
 	elevatorCosts := map[int]common.OrderCosts{
 		conf.ElevatorID: common.OrderCosts{
-			CostsUp:   make([]float64, conf.NumFloors-1),
-			CostsDown: make([]float64, conf.NumFloors-1),
+			ID:        conf.ElevatorID,
+			CostsUp:   make([]float64, conf.NumFloors),
+			CostsDown: make([]float64, conf.NumFloors),
+			CostsCab:  make([]float64, conf.NumFloors),
 		},
 	}
 	timer := time.NewTicker(time.Second)
@@ -76,6 +85,8 @@ func Run(ctx context.Context, conf Config) {
 			} else {
 				log.Panicln("This elevators id not in cost map")
 			}
+		case elevatorStatus := <-conf.ElevatorStatus:
+
 		case costs := <-conf.CostsRecv:
 			elevatorCosts[costs.ID] = costs
 		case order := <-conf.NewOrderRecv:
@@ -87,11 +98,7 @@ func Run(ctx context.Context, conf Config) {
 					log.Println("Error removing order: ", err)
 				}
 			case common.DownDir:
-				if err := tryRemoveOrderFromSlice(orders.OrdersDown, order.Floor-1); err != nil {
-					log.Println("Error removing order: ", err)
-				}
-			case common.NoDir:
-				if err := tryRemoveOrderFromSlice(orders.OrdersCab, order.Floor); err != nil {
+				if err := tryRemoveOrderFromSlice(orders.OrdersDown, order.Floor); err != nil {
 					log.Println("Error removing order: ", err)
 				}
 			}
@@ -160,6 +167,10 @@ func Run(ctx context.Context, conf Config) {
 	}
 }
 
+func updateElevatorCost(costs *common.OrderCosts, status ElevatorStatus) {
+
+}
+
 func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
 	//DeepCopy slices
 	msg := common.OrderCosts{
@@ -179,7 +190,7 @@ func selectAssignee(assignees map[int]common.OrderCosts, floor int, dir common.D
 				assignee = k
 			}
 		case common.DownDir:
-			if cost := v.CostsDown[floor-1]; cost < minCost {
+			if cost := v.CostsDown[floor]; cost < minCost {
 				minCost = cost
 				assignee = k
 			}
@@ -197,7 +208,7 @@ func findHighestPriority(orders *schedOrders, cost common.OrderCosts, id int) *S
 		if order.Assignee != id {
 			continue
 		}
-		orderCost := cost.Cab[order.Floor]
+		orderCost := cost.C[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
 			currOrder = order
@@ -207,7 +218,7 @@ func findHighestPriority(orders *schedOrders, cost common.OrderCosts, id int) *S
 		if order.Assignee != id {
 			continue
 		}
-		orderCost := cost.Down[order.Floor]
+		orderCost := cost.CostsDown[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
 			currOrder = order
@@ -217,7 +228,7 @@ func findHighestPriority(orders *schedOrders, cost common.OrderCosts, id int) *S
 		if order.Assignee != id {
 			continue
 		}
-		orderCost := cost.Up[order.Floor]
+		orderCost := cost.CostsUp[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
 			currOrder = order
@@ -245,7 +256,7 @@ func handleNewOrder(orders *schedOrders, order SchedulableOrder) error {
 			return err
 		}
 	case common.DownDir:
-		if err := tryAddOrderToSlice(orders.OrdersDown, order.Floor-1, order); err != nil {
+		if err := tryAddOrderToSlice(orders.OrdersDown, order.Floor, order); err != nil {
 			return err
 		}
 	case common.NoDir:
