@@ -20,6 +20,7 @@ type SchedulableOrder struct {
 	Timestamp    time.Time `json:"timestamp"`
 }
 
+//Config contains scheduler configuration variables
 type Config struct {
 	ElevatorID         int
 	ButtonPressed      <-chan elevio.ButtonEvent
@@ -48,6 +49,8 @@ type elevatorCost struct {
 	Cab  []float64
 }
 
+//Run is the startingpoint for the scheduler module
+//The ctx context is used to stop the gorotine if the context expires.
 func Run(ctx context.Context, conf Config) {
 	orders := schedOrders{
 		ordersUp:   make([]*SchedulableOrder, conf.NumFloors-1),
