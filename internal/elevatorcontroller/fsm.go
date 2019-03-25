@@ -110,12 +110,12 @@ func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<-
 }
 
 func Test(ctx context.Context, conf Config) {
-	firstOrder := Order{UP, 2}
+	firstOrder := common.Order{common.UpDir, 2}
 	conf.Order <- firstOrder
 	for {
 		select {
 		case  <-conf.OrderCompleted:
-			secondOrder := Order{DOWN,1}
+			secondOrder := common.Order{common.DownDir,1}
 			conf.Order <- secondOrder
 		}
 	}
@@ -132,7 +132,7 @@ func Run(ctx context.Context, conf Config) {
 		case fsm.currentOrder = <-conf.Order:
 			log.Printf("New orders %v\n", fsm.currentOrder)
 			fsm.handleNewOrders(conf)
-		case fsm.status.floor = <-conf.ArrivedAtFloor:
+		case fsm.status.Floor = <-conf.ArrivedAtFloor:
 			fsm.handleAtFloor(conf)
 		case <-fsm.timer.C:
 			fsm.handleTimerElapsed()
@@ -149,7 +149,7 @@ func (f *fsm) handleNewOrders(conf Config) {
 	currentFloor := f.status.Floor
 	targetDir := f.currentOrder.Dir
 
-	if (targetDir == UP && targetFloor >= conf.NumberOfFloors) || (targetDir == DOWN && targetFloor <= 0) {
+	if (targetDir == common.UpDir && targetFloor >= conf.NumberOfFloors) || (targetDir == common.DownDir && targetFloor <= 0) {
 		log.Panic()
 	}
 
@@ -230,8 +230,8 @@ func (f *fsm) transitionToMovingDown(conf Config) {							//julie
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.DownDir
-	conf.ElevatorInfo <- elevstat
-	fmt.Println(elevstat)
+	conf.ElevatorInfo <- f.status
+	fmt.Println(f.status)
 	f.state = stateMovingDown
 }
 
@@ -241,14 +241,14 @@ func (f *fsm) transitionToMovingUp(conf Config) {								//julie
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.UpDir
-	conf.ElevatorInfo <- elevstat
+	conf.ElevatorInfo <- f.status
 	f.state = stateMovingUp
 }
 
 //Initializes elevator when starting up
 func (f *fsm) init(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveUp
-	f.status.currentFloor = <- conf.ArrivedAtFloor
+	f.status.Floor = <- conf.ArrivedAtFloor
 	f.elevatorCommand <- elevatordriver.Stop
 }
 
