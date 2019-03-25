@@ -115,9 +115,8 @@ func main() {
 	go elevatorcontroller.Run(ctx, controllerConf)
 
 	//Create two AtLeastOnce topics
-	waitGroup.Add(2)
-	go network.RunAtLeastOnce(ctx, &waitGroup, topicNewOrderConf)
-	go network.RunAtLeastOnce(ctx, &waitGroup, topicOrderCompletedConf)
+	go network.RunAtLeastOnce(ctx, topicNewOrderConf)
+	go network.RunAtLeastOnce(ctx, topicOrderCompletedConf)
 
 	//Wait for scheduler to complete
 	waitGroup.Add(1)
@@ -142,6 +141,8 @@ func main() {
 
 	//Wait for important goroutines to exit
 	waitGroup.Wait()
+	fmt.Println("Done")
+	os.Exit(0)
 }
 
 func handleSignals(sig <-chan os.Signal, cancelCtx func()) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"reflect"
-	"sync"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
 )
@@ -21,9 +20,8 @@ type AtMostOnceConfig struct {
 //RunAtMostOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
 //We use reflection to allow multiple channel types. The network module does not care what the user want to send.
-func RunAtMostOnce(ctx context.Context, waitGroup *sync.WaitGroup, conf AtMostOnceConfig) {
-	//Signal thread ready for exit
-	defer waitGroup.Wait()
+func RunAtMostOnce(ctx context.Context, conf AtMostOnceConfig) {
+	//Signal done when ready to exit
 	//Create channels
 	atMostOnceTx, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	if err != nil {
@@ -42,19 +40,10 @@ func RunAtMostOnce(ctx context.Context, waitGroup *sync.WaitGroup, conf AtMostOn
 	outChan := reflect.ValueOf(conf.Receive)
 
 	//Wait for broadcast goroutines
-	waitBroadcast := sync.WaitGroup{}
-	waitBroadcast.Add(2)
-
-	ctx, cancel := context.WithCancel(ctx)
 	//Create template used for Unmarshalling
 	//Launch transmitter and receiver
-	go broadcastTransmitter(ctx, &waitBroadcast, conf.Port, conf.ID, atMostOnceTx)
-	go broadcastReceiver(ctx, &waitBroadcast, conf.Port, conf.ID, atMostOnceRx, T)
-
-	//Wait for broadcast goroutines to finish
-	defer waitBroadcast.Wait()
-	//Cancel goroutines on exit
-	defer cancel()
+	go broadcastTransmitter(ctx, conf.Port, conf.ID, atMostOnceTx)
+	go broadcastReceiver(ctx, conf.Port, conf.ID, atMostOnceRx, T)
 
 	//Wait for completion
 	for {

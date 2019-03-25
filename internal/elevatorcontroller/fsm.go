@@ -126,12 +126,10 @@ func Run(ctx context.Context, conf Config) {
 	fsm := newFSM(conf.ElevatorCommand, conf.OrderCompleted)
 	fsm.transitionToDoorOpen()
 	fsm.init(conf)
-	log.Println("done")
 	for {
 		select {
 		case order := <-conf.Order:
 			fsm.currentOrder = &order
-			log.Printf("New orders %v\n", fsm.currentOrder)
 			fsm.handleNewOrders(conf)
 		case fsm.status.Floor = <-conf.ArrivedAtFloor:
 			fsm.handleAtFloor(conf)

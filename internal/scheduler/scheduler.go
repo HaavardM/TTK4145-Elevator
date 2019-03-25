@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 	"github.com/TTK4145/driver-go/elevio"
@@ -67,13 +69,22 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		},
 	}
 
+	//Channel used to avoid select blocking when neccessary
+	skip := make(chan struct{})
+
 	//Load orders if file exists
 	if fileExists(conf.FolderPath) {
-		tmp, err := readFromOrdersFile(conf.FolderPath)
+		fileOrders, err := readFromOrdersFile(conf.FolderPath)
 		if err != nil {
 			log.Panicf("Error reading from file: %s\n", err)
 		}
-		orders = *tmp
+		log.Printf("Loading orders from file: %+v\n", fileOrders)
+		spew.Dump(fileOrders)
+		publishAllHallOrders(fileOrders, conf.NewOrderSend)
+		orders.OrdersCab = fileOrders.OrdersCab
+		go func() {
+			skip <- struct{}{}
+		}()
 	}
 
 	//Load system configuration
@@ -83,7 +94,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			//Delete orders file on clean exit
 			deleteOrdersFile(conf.FolderPath)
 			return
-
+		case <-skip:
+			//Continue after select
 		case elevatorStatus := <-conf.ElevStatus:
 			if cost, ok := costMap[conf.ElevatorID]; ok {
 				updateElevatorCost(cost, elevatorStatus)
@@ -159,10 +171,22 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		//Find next order and send to elevatorcontroller
 		order := findHighestPriority(&orders, costMap[conf.ElevatorID], conf.ElevatorID)
 		if order != nil {
-			log.Println("Sending order")
 			go func() {
 				conf.ElevExecuteOrder <- order.Order
 			}()
+		}
+	}
+}
+
+func publishAllHallOrders(orders *schedOrders, send chan<- SchedulableOrder) {
+	for _, order := range orders.OrdersDown {
+		if order != nil {
+			send <- *order
+		}
+	}
+	for _, order := range orders.OrdersUp {
+		if order != nil {
+			send <- *order
 		}
 	}
 }
@@ -172,15 +196,11 @@ func handleElevUpDownBtnPressed(btn elevio.ButtonEvent, costMap map[int]*common.
 	case elevio.BT_HallDown:
 		assignee := selectAssignee(costMap, btn.Floor, common.DownDir)
 		order := createOrder(btn.Floor, common.DownDir, assignee)
-		fmt.Println("Start send btn")
 		sendOrder <- *order
-		fmt.Println("End send btn")
 	case elevio.BT_HallUp:
 		assignee := selectAssignee(costMap, btn.Floor, common.UpDir)
 		order := createOrder(btn.Floor, common.UpDir, assignee)
-		fmt.Println("Start send btn")
 		sendOrder <- *order
-		fmt.Println("End send btn")
 	default:
 		log.Panic("Invalid button type")
 	}

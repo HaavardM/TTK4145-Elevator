@@ -53,7 +53,7 @@ func readFromOrdersFile(folderPath string) (*schedOrders, error) {
 }
 
 func fileExists(folderPath string) bool {
-	if _, err := os.Stat(folderPath + fileSubPath); err != nil {
+	if _, err := os.Stat(folderPath + fileSubPath); err == nil {
 		return true
 	} else if os.IsNotExist(err) {
 		return false

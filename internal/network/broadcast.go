@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
@@ -17,10 +16,7 @@ type broadcastMsg struct {
 }
 
 //broadcastReceiver receives JSON messages from a UDP broadcast port and unmarshalls into template
-func broadcastReceiver(ctx context.Context, waitGroup *sync.WaitGroup, port int, id int, message chan<- interface{}, T reflect.Type) {
-	//Signal gorotine has exited
-	//Defer is stack based - last-in-first-out
-	defer waitGroup.Done()
+func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, T reflect.Type) {
 	noConn := make(chan error)
 	defer close(noConn)
 	conn, _, err := createConn(port)
@@ -73,7 +69,7 @@ func broadcastReceiver(ctx context.Context, waitGroup *sync.WaitGroup, port int,
 }
 
 //
-func broadcastTransmitter(ctx context.Context, waitGroup *sync.WaitGroup, port int, id int, message <-chan interface{}) {
+func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan interface{}) {
 	noConn := make(chan error)
 	transmitQueue := utilities.RChan2RWChan(ctx, message)
 	conn, addr, err := createConn(port)

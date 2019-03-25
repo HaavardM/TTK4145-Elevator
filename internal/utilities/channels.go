@@ -14,9 +14,9 @@ func ReflectChan2InterfaceChan(ctx context.Context, r reflect.Value) (<-chan int
 		return nil, errors.New("Input value is not a channel type")
 	}
 	c := make(chan interface{})
-	defer close(c)
 	go func() {
 		done := false
+		defer close(c)
 		for !done {
 			//Get next value from channel
 			if val, ok := r.Recv(); ok {

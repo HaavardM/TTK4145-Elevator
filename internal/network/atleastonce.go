@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/rs/xid"
@@ -36,7 +35,7 @@ type AtLeastOnceConfig struct {
 
 //RunAtLeastOnce runs at most once publishing at a certain port
 //Service is limited to one datatype per port
-func RunAtLeastOnce(ctx context.Context, waitGroup *sync.WaitGroup, conf AtLeastOnceConfig) {
+func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 
 	//Store received acks for current messages
 	acks := make(map[string]IDSet)
@@ -73,7 +72,7 @@ func RunAtLeastOnce(ctx context.Context, waitGroup *sync.WaitGroup, conf AtLeast
 		Receive: bRecv,
 		Config:  conf.Config,
 	}
-	go RunAtMostOnce(ctx, waitGroup, c)
+	go RunAtMostOnce(ctx, c)
 
 	//Wait for new input
 	for {
