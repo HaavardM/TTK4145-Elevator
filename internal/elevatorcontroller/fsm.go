@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"time"
+	"fmt"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 )
@@ -129,7 +130,7 @@ func Run(ctx context.Context, conf Config, elevstat Elevatorstatus) {
 		select {
 		case fsm.currentOrder = <-conf.Order:
 			log.Printf("New orders %v\n", fsm.currentOrder)
-			fsm.handleNewOrders(conf)
+			fsm.handleNewOrders(conf, elevstat)
 		case fsm.currentFloor = <-conf.ArrivedAtFloor:
 			fsm.handleAtFloor(conf, elevstat)
 		case <-fsm.timer.C:
@@ -142,7 +143,7 @@ func Run(ctx context.Context, conf Config, elevstat Elevatorstatus) {
 
 
 //Handles incomming orders from the scheduler module
-func (f *fsm) handleNewOrders(conf Config) {
+func (f *fsm) handleNewOrders(conf Config, elevstat Elevatorstatus) {
 	targetFloor := f.currentOrder.Floor
 	currentFloor := f.currentFloor
 	targetDir := f.currentOrder.Dir
