@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -19,12 +18,12 @@ func saveToOrdersFile(folderPath string, currentOrders *schedOrders) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("marshal performed successfully")
+	//Save to temporary file
 	err = ioutil.WriteFile(folderPath+fileSubPath+".tmp", tofile, 0644) //
 	if err != nil {
 		return err
 	}
-	fmt.Println("written to file")
+	//Rename file when write was successfull
 	err = os.Rename(folderPath+fileSubPath+".tmp", folderPath+fileSubPath)
 	if err != nil {
 		return err
@@ -45,15 +44,11 @@ func readFromOrdersFile(folderPath string) (*schedOrders, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("Read from json-file")
 
 	err = json.Unmarshal(jsonContent, &orderlist)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("Unmarshal has been performed successfully")
-	fmt.Println(orderlist)
-
 	return &orderlist, nil
 }
 
