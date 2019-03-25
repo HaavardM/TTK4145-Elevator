@@ -38,7 +38,7 @@ func (s state) String() string {
 
 }
 
-//Direction used to define preferred elevator direction
+/*//Direction used to define preferred elevator direction
 type Direction int
 
 const (
@@ -72,16 +72,16 @@ func (d Direction) String() string {
 type Order struct {
 	Dir   Direction
 	Floor int
-}
+}*/
 
 //Config used to configure the fsm
 type Config struct {
 	ElevatorCommand chan<- elevatordriver.Command
 	ElevatorEvents  <-chan elevatordriver.Event
-	Order         chan Order
+	Order         chan common.Order 			//common.Order
 	ArrivedAtFloor  <-chan int
 	NumberOfFloors int 
-	OrderCompleted chan Order
+	OrderCompleted chan common.Order 			//common.Order
 	ElevatorInfo chan<- common.Elevatorstatus
 }
 
@@ -89,14 +89,14 @@ type fsm struct {
 	state           state
 	timer           *time.Timer
 	elevatorCommand chan<- elevatordriver.Command
-	currentOrder	Order
-	orderCompleted 	chan<- Order
+	currentOrder	common.Order 				//common.Order
+	orderCompleted 	chan<- common.Order 		//common.Order
 	status common.Elevatorstatus
 }
 
 const doorOpenDuration = 3*time.Second
 
-func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<-Order) *fsm {
+func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<-common.Order) *fsm {
 	temp := &fsm{
 		state:           stateDoorClosed,
 		timer:           time.NewTimer(doorOpenDuration),
@@ -129,7 +129,7 @@ func Run(ctx context.Context, conf Config) {
 	log.Println("done")
 	for {
 		select {
-		case fsm.currentOrder = <-conf.Order:
+		case fsm.currentOrder = <-conf.Order:	//common
 			log.Printf("New orders %v\n", fsm.currentOrder)
 			fsm.handleNewOrders(conf)
 		case fsm.status.floor = <-conf.ArrivedAtFloor:
@@ -229,7 +229,7 @@ func (f *fsm) transitionToMovingDown(conf Config, elevstat *Elevatorstatus) {			
 	log.Println("Transition to moving down")
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
-	elevstat.ElevatorDir = DOWN
+	elevstat.Dir = DownDir
 	conf.ElevatorInfo <- elevstat
 	fmt.Println(elevstat)
 	f.state = stateMovingDown
@@ -240,7 +240,7 @@ func (f *fsm) transitionToMovingUp(conf Config, elevstat *Elevatorstatus) {					
 	log.Println("Transition to moving up")
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
-	elevstat.ElevatorDir = UP
+	elevstat.Dir = UpDir
 	conf.ElevatorInfo <- elevstat
 	f.state = stateMovingUp
 }
