@@ -211,6 +211,8 @@ func (f *fsm) transitionToDoorOpen() {
 func (f *fsm) transitionToDoorClosed() {
 	log.Println("Transition to door closed")
 	f.elevatorCommand <- elevatordriver.CloseDoor
+	f.status.Dir = common.NoDir
+	conf.ElevatorInfo <- f.status
 	f.state = stateDoorClosed
 	f.orderCompleted <- f.currentOrder
 }
