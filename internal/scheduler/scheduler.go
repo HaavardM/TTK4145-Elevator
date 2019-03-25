@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
@@ -46,7 +47,10 @@ type schedOrders struct {
 
 //Run is the startingpoint for the scheduler module
 //The ctx context is used to stop the gorotine if the context expires.
-func Run(ctx context.Context, conf Config) {
+func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
+	//Used to make sure main routine waits for this goroutine to finish
+	defer waitGroup.Done()
+
 	//Contains orders for all floors and directions
 	orders := schedOrders{
 		OrdersUp:   make([]*SchedulableOrder, conf.NumFloors),
@@ -87,10 +91,8 @@ func Run(ctx context.Context, conf Config) {
 			handleOrderCompleted(&orders, order)
 		case order := <-conf.ElevCompletedOrder:
 			log.Printf("Elev completed order %v\n", order)
+			orders.OrdersCab[order.Floor] = nil
 			switch order.Dir {
-			case common.NoDir:
-				//Clear orders
-				orders.OrdersCab[order.Floor] = nil
 			case common.DownDir:
 				schedOrder := orders.OrdersDown[order.Floor]
 				if schedOrder != nil {
@@ -98,7 +100,7 @@ func Run(ctx context.Context, conf Config) {
 				} else {
 					log.Println("Unexpected order completed")
 				}
-			case common.UpDir:
+			case common.UpDir, common.NoDir:
 				schedOrder := orders.OrdersUp[order.Floor]
 				if schedOrder != nil {
 					conf.OrderCompletedSend <- *schedOrder

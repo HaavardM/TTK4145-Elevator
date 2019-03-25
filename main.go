@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
+	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
 
@@ -18,18 +20,16 @@ import (
 )
 
 const (
+	//TopicNewOrder is a AtLeastOnceTopic used to send new orders
 	TopicNewOrder int = iota + 1
+	//TopicOrderComplete is an AtLeastOnceTopic used to send order complete msgs
 	TopicOrderComplete
 )
-
-type Test struct {
-	M string
-	N string
-}
 
 func main() {
 	//Main context
 	ctx, cancel := context.WithCancel(context.Background())
+	waitGroup := sync.WaitGroup{}
 
 	//Get configration
 	conf := configuration.GetConfig()
@@ -113,13 +113,24 @@ func main() {
 	//Launch modules
 	go elevatordriver.Run(ctx, elevatorConf)
 	go elevatorcontroller.Run(ctx, controllerConf)
-	go network.RunAtLeastOnce(ctx, topicNewOrderConf)
-	go network.RunAtLeastOnce(ctx, topicOrderCompletedConf)
-	go scheduler.Run(ctx, schedulerConf)
+
+	//Create two AtLeastOnce topics
+	waitGroup.Add(2)
+	go network.RunAtLeastOnce(ctx, &waitGroup, topicNewOrderConf)
+	go network.RunAtLeastOnce(ctx, &waitGroup, topicOrderCompletedConf)
+
+	//Wait for scheduler to complete
+	waitGroup.Add(1)
+	go scheduler.Run(ctx, &waitGroup, schedulerConf)
 
 	go func() {
 		newOrderNodesOnline <- []int{1, 2}
 		orderCompletedNodesOnline <- []int{1, 2}
+	}()
+
+	go func() {
+		time.Sleep(10 * time.Second)
+		log.Panic("SOME PANIC")
 	}()
 
 	//Handle signals to get a graceful shutdown
@@ -129,6 +140,8 @@ func main() {
 	//Wait for shutdown
 	<-ctx.Done()
 
+	//Wait for important goroutines to exit
+	waitGroup.Wait()
 }
 
 func handleSignals(sig <-chan os.Signal, cancelCtx func()) {
