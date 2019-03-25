@@ -120,7 +120,7 @@ func Test(ctx context.Context, conf Config) {
 }
 
 //Run starts the elevatorcontroller fsm
-func Run(ctx context.Context, conf Config) {
+func Run(ctx context.Context, conf Config, elevstat Elevatorstatus) {
 	fsm := newFSM(conf.ElevatorCommand, conf.OrderCompleted)
 	fsm.transitionToDoorOpen()
 	fsm.init(conf)
@@ -131,7 +131,7 @@ func Run(ctx context.Context, conf Config) {
 			log.Printf("New orders %v\n", fsm.currentOrder)
 			fsm.handleNewOrders(conf)
 		case fsm.currentFloor = <-conf.ArrivedAtFloor:
-			fsm.handleAtFloor()
+			fsm.handleAtFloor(conf, elevstat)
 		case <-fsm.timer.C:
 			fsm.handleTimerElapsed()
 		case <-ctx.Done():
@@ -154,20 +154,20 @@ func (f *fsm) handleNewOrders(conf Config) {
 	switch f.state {
 	case stateMovingDown:
 		if f.orderAbove(currentFloor) {
-			f.transitionToMovingUp()
+			f.transitionToMovingUp(conf, elevstat)
 		}
 	case stateMovingUp:
 		if !f.orderAbove(currentFloor) {
-			f.transitionToMovingDown()
+			f.transitionToMovingDown(conf, elevstat)
 		}
 
 	case stateDoorOpen, stateDoorClosed:
 		if currentFloor == targetFloor {
 			f.transitionToDoorOpen()
 		} else if f.orderAbove(currentFloor) {
-			f.transitionToMovingUp()
+			f.transitionToMovingUp(conf, elevstat)
 		} else {
-			f.transitionToMovingDown()
+			f.transitionToMovingDown(conf, elevstat)
 		}
 	}
 }
