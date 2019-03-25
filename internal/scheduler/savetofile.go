@@ -1,41 +1,42 @@
 package scheduler
 
-import (	"encoding/json"
-			"fmt"
-			"os"
-			"io/ioutil"	
-			"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"		
-		)
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
 
-type OrderList struct{
-	Order []OrdersType
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
+)
+
+type OrderList struct {
+	Order []OrdersType `json:"orders"`
 }
 
 type OrdersType struct {
-	Dir		int
-	Floor	int
+	Dir   int `json:"direction"`
+	Floor int `json:"floor"`
 }
 
 //need to configure Filepath!!
 
-
 //turning an array of orders into json format before saving to a file. Saves to temporary file before
 //overwriting to make sure no data is lost if an error occurs.
-func savetofile(conf Config, currentOrders OrderList) {
-	path := conf.FilePath
+func savetofile(folderPath string, currentOrders OrderList) error {
+	conf := configuration.GetConfig()
 	tofile, err := json.Marshal(currentOrders)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 	fmt.Println("marshal performed successfully")
-	err = ioutil.WriteFile(path + "/temporaryOrders.json", tofile, 0644)	//
+	err = ioutil.WriteFile(folderPath+"/orders.json.tmp", tofile, 0644) //
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 	fmt.Println("written to file")
-	err = os.Rename(path + "/temporaryOrders.json", path + "/orderList.json")
+	err = os.Rename(folderPath+"/orders.json.tmp", folderPath+"/orders.json")
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
-	fmt.Println("saved to new file")
+	return nil
 }
