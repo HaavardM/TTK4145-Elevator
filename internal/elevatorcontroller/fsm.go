@@ -129,7 +129,7 @@ func Run(ctx context.Context, conf Config) {
 	log.Println("done")
 	for {
 		select {
-		case fsm.currentOrder = <-conf.Order:	//common
+		case fsm.currentOrder = <-conf.Order:
 			log.Printf("New orders %v\n", fsm.currentOrder)
 			fsm.handleNewOrders(conf)
 		case fsm.status.floor = <-conf.ArrivedAtFloor:
@@ -225,22 +225,22 @@ func (f *fsm) handleTimerElapsed() {
 }
 
 //handles transition from one state to moving down
-func (f *fsm) transitionToMovingDown(conf Config, elevstat *Elevatorstatus) {							//julie
+func (f *fsm) transitionToMovingDown(conf Config) {							//julie
 	log.Println("Transition to moving down")
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
-	elevstat.Dir = DownDir
+	f.status.Dir = common.DownDir
 	conf.ElevatorInfo <- elevstat
 	fmt.Println(elevstat)
 	f.state = stateMovingDown
 }
 
 //Handles transition from one state to moving up
-func (f *fsm) transitionToMovingUp(conf Config, elevstat *Elevatorstatus) {								//julie
+func (f *fsm) transitionToMovingUp(conf Config) {								//julie
 	log.Println("Transition to moving up")
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
-	elevstat.Dir = UpDir
+	f.status.Dir = common.UpDir
 	conf.ElevatorInfo <- elevstat
 	f.state = stateMovingUp
 }
