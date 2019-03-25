@@ -9,6 +9,7 @@ import (
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatorcontroller"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 	"github.com/TTK4145/driver-go/elevio"
 )
 
@@ -36,8 +37,9 @@ func main() {
 	elevatorEvents := make(chan elevatordriver.Event)
 	onButtonPress := make(chan elevio.ButtonEvent)
 	lightState := make(chan elevatordriver.LightState)
-	order := make(chan elevatorcontroller.Order)
-	orderCompleted := make(chan elevatorcontroller.Order)
+	order := make(chan common.Order)
+	orderCompleted := make(chan common.Order)
+	elevatorInfo := make(chan common.Elevatorstatus)					//julie
 
 	//Create elevator configuration
 	elevatorConf := elevatordriver.Config{
@@ -57,13 +59,14 @@ func main() {
 		Order:           order,
 		ArrivedAtFloor:  arrivedAtFloor,
 		NumberOfFloors:  conf.Floors,
-		OrderCompleted:  orderCompleted,
+		OrderCompleted:  orderCompleted,	
+		ElevatorInfo:	elevatorInfo,									//julie 
 	}
 
 	//Launch modules
 	go elevatordriver.Run(ctx, elevatorConf)
 	go elevatorcontroller.Run(ctx, controllerConf)
-	go elevatorcontroller.Test(ctx, controllerConf) ///juliehei
+	go elevatorcontroller.Test(ctx, controllerConf) 				///juliehei
 	go newButtonPressed(ctx, onButtonPress, order)
 
 	/*************************TEST CODE***********************/
@@ -110,25 +113,25 @@ func main() {
 	<-ctx.Done()
 }
 
-func newButtonPressed(ctx context.Context, onButtonPress <-chan elevio.ButtonEvent, elevatorOrder chan<- elevatorcontroller.Order) {
+func newButtonPressed(ctx context.Context, onButtonPress <-chan elevio.ButtonEvent, elevatorOrder chan<- common.Order) {
 	for {
 		select {
 		case b := <-onButtonPress:
-			order := elevatorcontroller.Order{}
+			order := common.Order{}
 			switch b.Button {
 			case elevio.BT_HallDown:
-				order = elevatorcontroller.Order{
-					Dir:   elevatorcontroller.DOWN,
+				order = common.Order{
+					Dir:   common.DownDir,
 					Floor: b.Floor,
 				}
 			case elevio.BT_HallUp:
-				order = elevatorcontroller.Order{
-					Dir:   elevatorcontroller.UP,
+				order = common.Order{
+					Dir:   common.UpDir,
 					Floor: b.Floor,
 				}
 			case elevio.BT_Cab:
-				order = elevatorcontroller.Order{
-					Dir:   elevatorcontroller.NoDirection,
+				order = common.Order{
+					Dir:   common.NoDir,
 					Floor: b.Floor,
 				}
 			}
