@@ -1,97 +1,79 @@
 package network
 
 import(
-		"../conn"
 		"time"
-		"sort"
 		"net"
-		"fmt"
 		"log"
+		"reflect"
+		"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 )
 
-type Cost []int
+const heartbInterval = 10*time.Millisecond
+const timeout = 10*heartbInterval
 
-type ElevatorState struct { //channel????? til scheduler
-	ID int
-	CostUp Cost
-	CostDown Cost
+type costConfig struct{
+	Config
+	OrderCostIn <-chan common.OrderCosts
+	OrderCostOut chan<- common.OrderCosts
+	LostElevators chan<- common.OrderCosts.ID
+	OnlineElevators chan<- []common.OrderCosts.ID
 }
 
-type networkMessage struct{
-	ID 		int `json:"id"`
-	Cost 	[]int `json:"cost"` //burde ikke cost være delt i to deler?
-}
+func runHeartbeat(ctx context.Context, conf costConfig){ 
+	sendHeartbeatChan := chan common.OrderCosts
+	recvHeartbeatChan := chan common.OrderCosts
+	defer close(common.OrderCosts)
 
-const interval = 10*time.Millisecond
-const timeout = 10*interval
-
-type heartbeatConfig struct{
-	ExternalCost <-chan Cost
-	InternalCost chan<- Cost
-}
-
-func runHeartbeat(ctx context.Context, conf Config, heartConf <-chan heartbeatConfig, id int){
-	sendHeartbeatChan := chan networkMessage
-	recvHeartbeatChan := chan networkMessage
-	recvCostChan := chan Cost
-	defer close(networkMessage)
-
-	go RunAtMostOnce(ctx, conf) 
-
-	lastHeartbeat := make(map[string]time.Time)
-
-	sendmsg:= networkMessage{
-		ID: id
-		Cost: <-recvCostChan 
+	atMostOnceConfig := AtMostOnceConfig {
+		Config: conf.Config,
+		Send: sendHeartbeatChan,
+		Receive: recvHeartbeatChan,
 	}
 
+	go RunAtMostOnce(ctx, atMostOnceConfig) 
+
+	mapLastHeartbeat := make(map[string]time.Time)
+
+	cost:= <-conf.OrderCostIn
+
+	onlineElevatorList:= []common.OrderCosts.ID
+
 	for{
-		update := false
+		idfound:=false
 		select{
 		case <-ctx.Done():
 			return
-		case rcvmsg := <-recvHeartbeatChan:
-			idfound := false
-			for id, _ := range lastHeartbeat{
-				if id = rcvmsg.id {
+
+		case rcvHeartb := <-recvHeartbeatChan: 
+			OrderCostOut<- recvHeartb
+			for id, _ := range mapLastHeartbeat{
+				if id == recvHeartb.ID {
+					idInMap = id
 					idfound = true
-				} 
+					break
+				}	
 			}
-			if !idfound {
-				log.Println("New heartbeat found with id: ", id)
-				update = true
+			if idfound{
+				mapLastHeartbeat[idInMap] = time.Now()
+			}else{
+				mapLastHeartbeat[rcvHeartb.ID] = time.Now()
+				onlineElevatorList = append(onlineElevatorList, rcvHeartb.ID)
 			}
-			lastHeartbeat[rcvmsg.id] = time.Now() 
+			OnlineElevators<- onlineElevatorList
+
 		case <- time.After(timeout):
-			for id, timestamp := range lastHeartbeat{
+			for id, timestamp := range mapLastHeartbeat{
 				if time.Now().Sub(timestamp) > timeout{
 					log.Println("Heartbeat timeout with id: ", id)	
-					delete(lastHeartbeat,id)
-					update = true
+					delete(mapLastHeartbeat,id)
+					delete(onlineElevatorList,id)
+					LostElevators<- id
 				}
 			}
-		case <- time.After(interval):
-			sendHeartbeatChan <- sendmsg
-		case cost := <- heartConf.InternalCost: ///HVOR KOMMER COSTEN FRA?????
-			sendmsg.Cost = cost 
-		}
-		if update {
-			msg := HeartbeatUpdate {}
-			externalCost := <- ExternalCost
-			for externalid, costup, costdown := externalCost{ //fra annen modul
-				//if externalid = id {
-					//do the for loop below
-				}
-			}
-				
-			for id, _ := lastHeartbeat {
-				msg.Heartbeats = append(msg.Heartbeats, ElevatorState {
-					ID: id,
-					CostUp: costup,
-					CostDown: costdown,
-				})
-			}
-			heartConf <- msg //til external ??
-		}
+		case <- time.After(heartbInterval):
+			sendHeartbeatChan <- sendHeartb
+
+		case cost = <- costConf.OrderCostIn:
+				sendHeartbeatChan<- cost
 	}
 }
