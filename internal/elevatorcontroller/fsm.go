@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 )
 
 const (
@@ -81,7 +82,7 @@ type Config struct {
 	ArrivedAtFloor  <-chan int
 	NumberOfFloors int 
 	OrderCompleted chan Order
-	ElevatorInfo chan<- common.Elevatorstatus		//Blir dette riktig?? Er det en scheduler eller en elevatorcontroller?
+	ElevatorInfo chan<- common.Elevatorstatus
 }
 
 type fsm struct {
