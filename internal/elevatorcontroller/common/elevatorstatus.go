@@ -1,7 +1,7 @@
-package elevatorcontroller ///eller scheduler???
+package common
 
 
 type Elevatorstatus struct {
-	ElevatorDir		Direction
-	ElevatorFloor	int
+	Dir		Direction
+	Floor	int
 }
