@@ -33,8 +33,8 @@ type Config struct {
 	NewOrderRecv       <-chan SchedulableOrder
 	OrderCompletedSend chan<- SchedulableOrder
 	OrderCompletedRecv <-chan SchedulableOrder
-	CurrentOrdersSend  chan<- []SchedulableOrder
-	CurrentOrdersRecv  <-chan []SchedulableOrder
+	CostsSend          chan<- common.OrderCosts
+	CostsRecv          <-chan common.OrderCosts
 
 	NumFloors int
 }
@@ -45,22 +45,22 @@ type schedOrders struct {
 	OrdersCab  []*SchedulableOrder `json:"orders_cab"`
 }
 
-type elevatorCost struct {
-	Up   []float64
-	Down []float64
-	Cab  []float64
-}
-
 //Run is the startingpoint for the scheduler module
 //The ctx context is used to stop the gorotine if the context expires.
 func Run(ctx context.Context, conf Config) {
+	//Contains orders for all floors and directions
 	orders := schedOrders{
 		OrdersUp:   make([]*SchedulableOrder, conf.NumFloors-1),
 		OrdersDown: make([]*SchedulableOrder, conf.NumFloors-1),
 		OrdersCab:  make([]*SchedulableOrder, conf.NumFloors),
 	}
+	elevatorCosts := map[int]common.OrderCosts{
+		conf.ElevatorID: common.OrderCosts{
+			CostsUp:   make([]float64, conf.NumFloors-1),
+			CostsDown: make([]float64, conf.NumFloors-1),
+		},
+	}
 	timer := time.NewTicker(time.Second)
-	elevatorCosts := make(map[int]elevatorCost)
 	sysConf := configuration.GetConfig()
 
 	for {
@@ -71,15 +71,13 @@ func Run(ctx context.Context, conf Config) {
 			return
 
 		case <-timer.C:
-			toSend := make([]SchedulableOrder, 0, len(orders.OrdersDown)+len(orders.OrdersUp))
-			for _, o := range orders.OrdersDown {
-				toSend = append(toSend, *o)
+			if costs, ok := elevatorCosts[conf.ElevatorID]; ok {
+				sendOrderCosts(conf.CostsSend, &costs)
+			} else {
+				log.Panicln("This elevators id not in cost map")
 			}
-
-			for _, o := range orders.OrdersUp {
-				toSend = append(toSend, *o)
-			}
-			conf.CurrentOrdersSend <- toSend
+		case costs := <-conf.CostsRecv:
+			elevatorCosts[costs.ID] = costs
 		case order := <-conf.NewOrderRecv:
 			handleNewOrder(&orders, order)
 		case order := <-conf.OrderCompletedRecv:
@@ -127,10 +125,12 @@ func Run(ctx context.Context, conf Config) {
 					orders.OrdersCab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
 				}
 			case elevio.BT_HallDown:
-				order := createOrder(btn.Floor, common.DownDir, selectAssignee(nil, btn.Floor, common.DownDir))
+				assignee := selectAssignee(elevatorCosts, btn.Floor, common.DownDir)
+				order := createOrder(btn.Floor, common.DownDir, assignee)
 				conf.NewOrderSend <- *order
 			case elevio.BT_HallUp:
-				order := createOrder(btn.Floor, common.UpDir, selectAssignee(nil, btn.Floor, common.UpDir))
+				assignee := selectAssignee(elevatorCosts, btn.Floor, common.UpDir)
+				order := createOrder(btn.Floor, common.UpDir, assignee)
 				conf.NewOrderSend <- *order
 			default:
 				log.Panic("Invalid button type")
@@ -157,15 +157,40 @@ func Run(ctx context.Context, conf Config) {
 		//Find next order and send to elevatorcontroller
 		order := findHighestPriority(&orders, elevatorCosts[conf.ElevatorID], conf.ElevatorID)
 		conf.ExecuteOrder <- order.Order
-
 	}
 }
 
-func selectAssignee(assignees map[int][]int, floor int, dir common.Direction) int {
-	return 1
+func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
+	//DeepCopy slices
+	msg := common.OrderCosts{
+		CostsDown: append(make([]float64, 0, len(costs.CostsDown)), costs.CostsDown...),
+		CostsUp:   append(make([]float64, 0, len(costs.CostsUp)), costs.CostsUp...),
+	}
+	c <- msg
+}
+func selectAssignee(assignees map[int]common.OrderCosts, floor int, dir common.Direction) int {
+	minCost := math.Inf(1)
+	assignee := -1
+	for k, v := range assignees {
+		switch dir {
+		case common.UpDir:
+			if cost := v.CostsUp[floor]; cost < minCost {
+				minCost = cost
+				assignee = k
+			}
+		case common.DownDir:
+			if cost := v.CostsDown[floor-1]; cost < minCost {
+				minCost = cost
+				assignee = k
+			}
+		default:
+			log.Panicf("Invalid direction %s\n", dir)
+		}
+	}
+	return assignee
 }
 
-func findHighestPriority(orders *schedOrders, cost elevatorCost, id int) *SchedulableOrder {
+func findHighestPriority(orders *schedOrders, cost common.OrderCosts, id int) *SchedulableOrder {
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
 	for _, order := range orders.OrdersCab {
@@ -198,9 +223,7 @@ func findHighestPriority(orders *schedOrders, cost elevatorCost, id int) *Schedu
 			currOrder = order
 		}
 	}
-
 	return currOrder
-
 }
 
 func createOrder(floor int, dir common.Direction, assignee int) *SchedulableOrder {
