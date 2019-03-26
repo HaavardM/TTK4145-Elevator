@@ -74,6 +74,10 @@ type Order struct {
 	Floor int
 }*/
 
+func sendElevatorStatus(c chan<- common.ElevatorStatus, status common.ElevatorStatus) {
+	c <- status
+}
+
 //Config used to configure the fsm
 type Config struct {
 	ElevatorCommand chan<- elevatordriver.Command
@@ -82,7 +86,7 @@ type Config struct {
 	ArrivedAtFloor  <-chan int
 	NumberOfFloors  int
 	OrderCompleted  chan common.Order //common.Order
-	ElevatorInfo    chan<- common.ElevatorStatus
+	ElevatorStatus  chan<- common.ElevatorStatus
 }
 
 type fsm struct {
@@ -124,7 +128,6 @@ func Test(ctx context.Context, conf Config) {
 //Run starts the elevatorcontroller fsm
 func Run(ctx context.Context, conf Config) {
 	fsm := newFSM(conf.ElevatorCommand, conf.OrderCompleted)
-	fsm.transitionToDoorOpen()
 	fsm.init(conf)
 	for {
 		select {
@@ -188,7 +191,7 @@ func (f *fsm) orderAbove(floor int) bool {
 
 //Handles events that occur when reaching a new floow
 func (f *fsm) handleAtFloor(conf Config) { //julie
-	conf.ElevatorInfo <- f.status
+	go sendElevatorStatus(conf.ElevatorStatus, f.status)
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
 		if f.shouldStop(f.status.Floor) {
@@ -232,7 +235,7 @@ func (f *fsm) transitionToMovingDown(conf Config) { //julie
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.DownDir
-	conf.ElevatorInfo <- f.status
+	go sendElevatorStatus(conf.ElevatorStatus, f.status)
 	fmt.Println(f.status)
 	f.state = stateMovingDown
 }
@@ -244,7 +247,7 @@ func (f *fsm) transitionToMovingUp(conf Config) { //julie
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.UpDir
 	log.Println("Start")
-	conf.ElevatorInfo <- f.status
+	go sendElevatorStatus(conf.ElevatorStatus, f.status)
 	log.Println("End")
 	f.state = stateMovingUp
 }

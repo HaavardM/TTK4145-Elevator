@@ -75,7 +75,9 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 	conn, addr, err := createConn(port)
 	defer conn.Close()
 	if err != nil {
-		noConn <- err
+		go func() {
+			noConn <- err
+		}()
 	}
 	for {
 		select {

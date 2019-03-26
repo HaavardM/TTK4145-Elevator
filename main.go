@@ -68,7 +68,7 @@ func main() {
 		ArrivedAtFloor:  arrivedAtFloor,
 		NumberOfFloors:  conf.Floors,
 		OrderCompleted:  orderCompleted,
-		ElevatorInfo:    elevatorInfo, //julie
+		ElevatorStatus:  elevatorInfo, //julie
 	}
 
 	newOrderNodesOnline := make(chan []int)
@@ -141,7 +141,6 @@ func main() {
 
 	//Wait for important goroutines to exit
 	waitGroup.Wait()
-	fmt.Println("Done")
 	os.Exit(0)
 }
 
