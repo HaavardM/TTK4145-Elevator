@@ -19,7 +19,7 @@ import (
 //SchedulableOrder is an order with a priority and cost
 type SchedulableOrder struct {
 	common.Order `json:"order"`
-	Assignee     int       `json:"assignee"`
+	Worker       int       `json:"assignee"`
 	Timestamp    time.Time `json:"timestamp"`
 }
 
@@ -60,7 +60,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		OrdersCab:  make([]*SchedulableOrder, conf.NumFloors),
 	}
 	//Contains the cost for orders to all floor by all elevators
-	costMap := map[int]*common.OrderCosts{
+	workers := map[int]*common.OrderCosts{
 		conf.ElevatorID: &common.OrderCosts{
 			ID:        conf.ElevatorID,
 			CostsUp:   make([]float64, conf.NumFloors),
@@ -103,9 +103,9 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		case <-skipSelect:
 			//Continue after select
 		case <-orderTimeout.C:
-			republishInvalidOrders(&orders, time.Minute, costMap, conf.NewOrderSend)
+			reassignInvalidOrders(&orders, time.Minute, workers, conf.NewOrderSend)
 		case elevatorStatus := <-conf.ElevStatus:
-			if cost, ok := costMap[conf.ElevatorID]; ok {
+			if cost, ok := workers[conf.ElevatorID]; ok {
 				updateElevatorCost(cost, elevatorStatus)
 				//Send cost using deep copy
 				go sendOrderCosts(conf.CostsSend, cost)
@@ -113,7 +113,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 				log.Panicf("Missing elevator cost in costmap")
 			}
 		case costs := <-conf.CostsRecv:
-			costMap[costs.ID] = &costs
+			workers[costs.ID] = &costs
 		case order := <-conf.NewOrderRecv:
 			handleNewOrder(&orders, order)
 		case order := <-conf.OrderCompletedRecv:
@@ -147,7 +147,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 					orders.OrdersCab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
 				}
 			} else {
-				handleElevUpDownBtnPressed(btn, costMap, conf.NewOrderSend)
+				handleElevUpDownBtnPressed(btn, workers, conf.NewOrderSend)
 			}
 		}
 
@@ -177,7 +177,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		}
 
 		//Find next order and send to elevatorcontroller
-		order := findHighestPriority(&orders, costMap[conf.ElevatorID], conf.ElevatorID)
+		order := findHighestPriority(&orders, workers[conf.ElevatorID], conf.ElevatorID)
 		if order != nil && order != lastOrder {
 			lastOrder = order
 			conf.ElevExecuteOrder <- order.Order
@@ -185,7 +185,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 	}
 }
 
-func republishInvalidOrders(orders *schedOrders, timeout time.Duration, assignees map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
+func reassignInvalidOrders(orders *schedOrders, timeout time.Duration, workers map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
 	orderListsToCheck := [][]*SchedulableOrder{orders.OrdersDown, orders.OrdersDown}
 	//Check for timeout or invalid assignee
 	for _, orderList := range orderListsToCheck {
@@ -201,13 +201,13 @@ func republishInvalidOrders(orders *schedOrders, timeout time.Duration, assignee
 			}
 
 			//If assignee (elevator id) does not exist
-			if _, ok := assignees[order.Assignee]; !ok {
+			if _, ok := workers[order.Worker]; !ok {
 				renewOrder = true
 			}
 
 			if renewOrder {
-				assignee := selectAssignee(assignees, order.Floor, order.Dir)
-				newOrder := createOrder(order.Floor, order.Dir, assignee)
+				worker := selectWorker(workers, order.Floor, order.Dir)
+				newOrder := createOrder(order.Floor, order.Dir, worker)
 				sendOrder <- *newOrder
 			}
 		}
@@ -234,12 +234,12 @@ func publishAllHallOrders(orders *schedOrders, send chan<- SchedulableOrder) {
 func handleElevUpDownBtnPressed(btn elevio.ButtonEvent, costMap map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
 	switch btn.Button {
 	case elevio.BT_HallDown:
-		assignee := selectAssignee(costMap, btn.Floor, common.DownDir)
-		order := createOrder(btn.Floor, common.DownDir, assignee)
+		worker := selectWorker(costMap, btn.Floor, common.DownDir)
+		order := createOrder(btn.Floor, common.DownDir, worker)
 		sendOrder <- *order
 	case elevio.BT_HallUp:
-		assignee := selectAssignee(costMap, btn.Floor, common.UpDir)
-		order := createOrder(btn.Floor, common.UpDir, assignee)
+		worker := selectWorker(costMap, btn.Floor, common.UpDir)
+		order := createOrder(btn.Floor, common.UpDir, worker)
 		sendOrder <- *order
 	default:
 		log.Panic("Invalid button type")
@@ -258,33 +258,33 @@ func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
 	}
 	c <- msg
 }
-func selectAssignee(assignees map[int]*common.OrderCosts, floor int, dir common.Direction) int {
+func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Direction) int {
 	minCost := math.Inf(1)
-	assignee := -1
-	for k, v := range assignees {
+	worker := -1
+	for k, v := range workers {
 		switch dir {
 		case common.UpDir:
 			if cost := v.CostsUp[floor]; cost < minCost {
 				minCost = cost
-				assignee = k
+				worker = k
 			}
 		case common.DownDir:
 			if cost := v.CostsDown[floor]; cost < minCost {
 				minCost = cost
-				assignee = k
+				worker = k
 			}
 		default:
 			log.Panicf("Invalid direction %s\n", dir)
 		}
 	}
-	return assignee
+	return worker
 }
 
 func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *SchedulableOrder {
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
 	for _, order := range orders.OrdersCab {
-		if order == nil || order.Assignee != id {
+		if order == nil || order.Worker != id {
 			continue
 		}
 		orderCost := cost.CostsCab[order.Floor]
@@ -294,7 +294,7 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 		}
 	}
 	for _, order := range orders.OrdersDown {
-		if order == nil || order.Assignee != id {
+		if order == nil || order.Worker != id {
 			continue
 		}
 		orderCost := cost.CostsDown[order.Floor]
@@ -304,7 +304,7 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 		}
 	}
 	for _, order := range orders.OrdersUp {
-		if order == nil || order.Assignee != id {
+		if order == nil || order.Worker != id {
 			continue
 		}
 		orderCost := cost.CostsUp[order.Floor]
@@ -322,7 +322,7 @@ func createOrder(floor int, dir common.Direction, assignee int) *SchedulableOrde
 			Floor: floor,
 			Dir:   dir,
 		},
-		Assignee:  assignee,
+		Worker:    assignee,
 		Timestamp: time.Now(),
 	}
 }
