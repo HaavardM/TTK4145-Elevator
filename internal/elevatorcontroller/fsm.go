@@ -161,11 +161,15 @@ func (f *fsm) handleNewOrders(conf Config) {
 
 	switch f.state {
 	case stateMovingDown:
-		if f.orderAbove(currentFloor) {
+		if currentFloor == targetFloor {
+			f.transitionToDoorOpen()
+		} else if f.orderAbove(currentFloor) {
 			f.transitionToMovingUp(conf)
 		}
 	case stateMovingUp:
-		if !f.orderAbove(currentFloor) {
+		if currentFloor == targetFloor {
+			f.transitionToDoorOpen()
+		} else if !f.orderAbove(currentFloor) {
 			f.transitionToMovingDown(conf)
 		}
 
@@ -191,7 +195,7 @@ func (f *fsm) orderAbove(floor int) bool {
 
 //Handles events that occur when reaching a new floow
 func (f *fsm) handleAtFloor(conf Config) { //julie
-	go sendElevatorStatus(conf.ElevatorStatus, f.status)
+	sendElevatorStatus(conf.ElevatorStatus, f.status)
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
 		if f.shouldStop(f.status.Floor) {
@@ -235,7 +239,7 @@ func (f *fsm) transitionToMovingDown(conf Config) { //julie
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.DownDir
-	go sendElevatorStatus(conf.ElevatorStatus, f.status)
+	sendElevatorStatus(conf.ElevatorStatus, f.status)
 	fmt.Println(f.status)
 	f.state = stateMovingDown
 }
@@ -247,7 +251,7 @@ func (f *fsm) transitionToMovingUp(conf Config) { //julie
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.UpDir
 	log.Println("Start")
-	go sendElevatorStatus(conf.ElevatorStatus, f.status)
+	sendElevatorStatus(conf.ElevatorStatus, f.status)
 	log.Println("End")
 	f.state = stateMovingUp
 }

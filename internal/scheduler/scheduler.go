@@ -69,6 +69,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		},
 	}
 
+	var lastOrder *SchedulableOrder = nil
+
 	//Channel used to avoid select blocking when neccessary
 	skip := make(chan struct{})
 
@@ -170,12 +172,15 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 
 		//Find next order and send to elevatorcontroller
 		order := findHighestPriority(&orders, costMap[conf.ElevatorID], conf.ElevatorID)
-		if order != nil {
-			go func() {
-				conf.ElevExecuteOrder <- order.Order
-			}()
+		if order != nil && order != lastOrder {
+			lastOrder = order
+			conf.ElevExecuteOrder <- order.Order
 		}
 	}
+}
+
+func sendOrderToElev(elev chan<- common.Order, order common.Order) {
+	elev <- order
 }
 
 func publishAllHallOrders(orders *schedOrders, send chan<- SchedulableOrder) {

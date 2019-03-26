@@ -39,9 +39,13 @@ func main() {
 	elevatorCommand := make(chan elevatordriver.Command)
 	onButtonPress := make(chan elevio.ButtonEvent)
 	lightState := make(chan elevatordriver.LightState)
-	order := make(chan common.Order)
 	orderCompleted := make(chan common.Order)
-	elevatorInfo := make(chan common.ElevatorStatus) //julie
+
+	//Make these buffered to avoid blocking on send
+	//We do not require the scheduler and elevatorcontroller to be in perfect sync,
+	//but the order of the messages sent on these channels must be correct
+	order := make(chan common.Order, 1)
+	elevatorInfo := make(chan common.ElevatorStatus, 1) //julie
 
 	topicNewOrderSend := make(chan scheduler.SchedulableOrder)
 	topicNewOrderRecv := make(chan scheduler.SchedulableOrder)
