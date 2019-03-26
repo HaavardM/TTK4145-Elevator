@@ -2,13 +2,13 @@ package network
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 )
 
-const heartbInterval = 10 * time.Millisecond
+const heartbInterval = 50 * time.Millisecond
 const timeout = 10 * heartbInterval
 
 //HeartbeatConfig contains config params for the heartbeat module
@@ -21,7 +21,7 @@ type HeartbeatConfig struct {
 }
 
 //RunHeartbeat is the main entrypoint for heartbeats
-func RunHeartbeat(ctx context.Context, conf HeartbeatConfig) {
+func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...chan<- []int) {
 	sendHeartbeatChan := make(chan common.OrderCosts)
 	recvHeartbeatChan := make(chan common.OrderCosts)
 	defer close(sendHeartbeatChan)
@@ -36,7 +36,14 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig) {
 	mapLastHeartbeat := make(map[int]time.Time)
 
 	//Wait for first ordercost from anotherm module
-	cost := <-conf.CostIn
+	cost := common.OrderCosts{
+		ID:        conf.ID,
+		CostsCab:  []float64{1.0, 2.0, 3.0, 4.0},
+		CostsUp:   []float64{1.0, 2.0, 3.0, 4.0},
+		CostsDown: []float64{1.0, 2.0, 3.0, 4.0},
+	}
+
+	timeoutTimer := time.NewTicker(timeout)
 
 	//Start atMostOnce service
 	go RunAtMostOnce(ctx, atMostOnceConfig)
@@ -62,25 +69,34 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig) {
 			mapLastHeartbeat[hbt.ID] = time.Now()
 			//If no previous heartbeat exitst - notify channels
 			if !idfound {
-				//Create online elevators message
-				msg := []int{}
-				for id := range mapLastHeartbeat {
-					msg = append(msg, id)
-				}
-				conf.OnlineElevators <- msg
+				//Publish online elevators list
+				go publishNodesOnline(mapLastHeartbeat, onlineElevators...)
+				fmt.Printf("New node detected %d\n", hbt.ID)
 			}
 
-		case <-time.After(timeout):
+		case <-timeoutTimer.C:
 			for id, timestamp := range mapLastHeartbeat {
 				if time.Now().Sub(timestamp) > timeout {
-					log.Println("Heartbeat timeout with id: ", id)
 					delete(mapLastHeartbeat, id)
 					conf.LostElevators <- id
+					//Published updated list of online elevators
+					go publishNodesOnline(mapLastHeartbeat, onlineElevators...)
+					fmt.Printf("Disconnected node detected %d\n", id)
 				}
 			}
 		case <-time.After(heartbInterval):
 			sendHeartbeatChan <- cost
 		}
 
+	}
+}
+
+func publishNodesOnline(mapLastHeartbeat map[int]time.Time, sends ...chan<- []int) {
+	for _, c := range sends {
+		msg := []int{}
+		for id := range mapLastHeartbeat {
+			msg = append(msg, id)
+		}
+		c <- msg
 	}
 }

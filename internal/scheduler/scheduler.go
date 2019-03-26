@@ -39,6 +39,7 @@ type Config struct {
 	OrderCompletedRecv <-chan SchedulableOrder
 	CostsSend          chan<- common.OrderCosts
 	CostsRecv          <-chan common.OrderCosts
+	WorkerLost         <-chan int
 }
 
 type schedOrders struct {
@@ -102,6 +103,9 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			return
 		case <-skipSelect:
 			//Continue after select
+		case id := <-conf.WorkerLost:
+			delete(workers, id)
+			reassignInvalidOrders(&orders, time.Minute, workers, conf.NewOrderSend)
 		case <-orderTimeout.C:
 			reassignInvalidOrders(&orders, time.Minute, workers, conf.NewOrderSend)
 		case elevatorStatus := <-conf.ElevStatus:
