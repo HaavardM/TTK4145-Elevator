@@ -116,8 +116,6 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 			if m.Ack {
 				if idSet, ok := acks[m.MessageID]; ok {
 					idSet[m.SenderID] = struct{}{}
-				} else {
-					log.Printf("Received ack for non existent message %v\n", m)
 				}
 			} else {
 				//Send ACK

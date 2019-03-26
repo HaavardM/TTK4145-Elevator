@@ -21,7 +21,7 @@ type Config struct {
 
 func createConn(port int) (net.PacketConn, *net.UDPAddr, error) {
 	conn := conn.DialBroadcastUDP(port)
-	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("127.255.255.255:%d", port))
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
 	if err != nil {
 		log.Panicf("Can't connect to net %s", err)
 		return nil, nil, err
