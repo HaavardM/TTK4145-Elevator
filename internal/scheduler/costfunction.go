@@ -1,11 +1,15 @@
 package scehduler
 
-func updateElevatorCost(costs *common.OrderCosts, status common.ElevatorStatus) {
+import (
+		"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
+)
+
+func updateElevatorCost(conf Config, costs *common.OrderCosts, status common.ElevatorStatus) {
 	penaltyToTarget := 7
 	penaltyTargetDir := 3
 	cabPenalty := 4
 
-	for i := 0; i < NumberOfFloors; i++ {
+	for i := 0; i < conf.NumFloors; i++ {
 		cost := (i - ElevatorFloot)*2	
 
 
