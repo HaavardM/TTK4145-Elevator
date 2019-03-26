@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
@@ -20,6 +21,11 @@ type HeartbeatConfig struct {
 	OnlineElevators chan<- []int
 }
 
+type stampedHeartbeat struct {
+	timestamp time.Time
+	hbt       common.OrderCosts
+}
+
 //RunHeartbeat is the main entrypoint for heartbeats
 func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...chan<- []int) {
 	sendHeartbeatChan := make(chan common.OrderCosts)
@@ -33,15 +39,10 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 		Receive: recvHeartbeatChan,
 	}
 	//Store last received heartbeats
-	mapLastHeartbeat := make(map[int]time.Time)
+	mapLastHeartbeat := make(map[int]stampedHeartbeat)
 
 	//Wait for first ordercost from anotherm module
-	cost := common.OrderCosts{
-		ID:        conf.ID,
-		CostsCab:  []float64{1.0, 2.0, 3.0, 4.0},
-		CostsUp:   []float64{1.0, 2.0, 3.0, 4.0},
-		CostsDown: []float64{1.0, 2.0, 3.0, 4.0},
-	}
+	cost := <-conf.CostIn
 
 	timeoutTimer := time.NewTicker(timeout)
 
@@ -56,17 +57,18 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 		case cost = <-conf.CostIn:
 
 		case hbt := <-recvHeartbeatChan:
-			idfound := false
+			_, idfound := mapLastHeartbeat[hbt.ID]
+
 			//Send orders cost (includes id) to receiver
-			conf.CostOut <- hbt
-			for id := range mapLastHeartbeat {
-				if id == hbt.ID {
-					idfound = true
-					break
-				}
+			if !idfound || !reflect.DeepEqual(hbt, mapLastHeartbeat[hbt.ID].hbt) {
+				fmt.Printf("New cost %v\n", hbt)
+				conf.CostOut <- hbt
 			}
 			//Store timestamp
-			mapLastHeartbeat[hbt.ID] = time.Now()
+			mapLastHeartbeat[hbt.ID] = stampedHeartbeat{
+				timestamp: time.Now(),
+				hbt:       hbt,
+			}
 			//If no previous heartbeat exitst - notify channels
 			if !idfound {
 				//Publish online elevators list
@@ -75,8 +77,8 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 			}
 
 		case <-timeoutTimer.C:
-			for id, timestamp := range mapLastHeartbeat {
-				if time.Now().Sub(timestamp) > timeout {
+			for id, hbt := range mapLastHeartbeat {
+				if time.Now().Sub(hbt.timestamp) > timeout {
 					delete(mapLastHeartbeat, id)
 					conf.LostElevators <- id
 					//Published updated list of online elevators
@@ -91,7 +93,7 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 	}
 }
 
-func publishNodesOnline(mapLastHeartbeat map[int]time.Time, sends ...chan<- []int) {
+func publishNodesOnline(mapLastHeartbeat map[int]stampedHeartbeat, sends ...chan<- []int) {
 	for _, c := range sends {
 		msg := []int{}
 		for id := range mapLastHeartbeat {

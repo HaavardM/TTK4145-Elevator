@@ -94,6 +94,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		skipSelect <- struct{}{}
 	}
 
+	go sendOrderCosts(conf.CostsSend, workers[conf.ElevatorID])
+
 	//Load system configuration
 	for {
 		select {
@@ -110,7 +112,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			reassignInvalidOrders(&orders, time.Minute, workers, conf.NewOrderSend)
 		case elevatorStatus := <-conf.ElevStatus:
 			if cost, ok := workers[conf.ElevatorID]; ok {
-				updateElevatorCost(cost, elevatorStatus)
+				updateElevatorCost(conf, cost, elevatorStatus)
 				//Send cost using deep copy
 				go sendOrderCosts(conf.CostsSend, cost)
 			} else {
@@ -261,13 +263,10 @@ func handleElevUpDownBtnPressed(btn elevio.ButtonEvent, costMap map[int]*common.
 	}
 }
 
-func updateElevatorCost(costs *common.OrderCosts, status common.ElevatorStatus) {
-
-}
-
 func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
 	//DeepCopy slices
 	msg := common.OrderCosts{
+		ID:        costs.ID,
 		CostsDown: append(make([]float64, 0, len(costs.CostsDown)), costs.CostsDown...),
 		CostsUp:   append(make([]float64, 0, len(costs.CostsUp)), costs.CostsUp...),
 	}

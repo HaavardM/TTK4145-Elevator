@@ -81,7 +81,6 @@ func sendElevatorStatus(c chan<- common.ElevatorStatus, status common.ElevatorSt
 //Config used to configure the fsm
 type Config struct {
 	ElevatorCommand chan<- elevatordriver.Command
-	ElevatorEvents  <-chan elevatordriver.Event
 	Order           chan common.Order //common.Order
 	ArrivedAtFloor  <-chan int
 	NumberOfFloors  int
