@@ -16,6 +16,7 @@ func ReflectChan2InterfaceChan(ctx context.Context, r reflect.Value) (<-chan int
 	c := make(chan interface{})
 	go func() {
 		done := false
+		defer close(c)
 		for !done {
 			//Get next value from channel
 			if val, ok := r.Recv(); ok {
@@ -28,8 +29,6 @@ func ReflectChan2InterfaceChan(ctx context.Context, r reflect.Value) (<-chan int
 				done = true
 			}
 		}
-		//clean up resources
-		close(c)
 	}()
 	return c, nil
 }
@@ -39,6 +38,7 @@ func RChan2RWChan(ctx context.Context, inChan <-chan interface{}) chan interface
 	outChan := make(chan interface{})
 	go func() {
 		running := true
+		defer close(outChan)
 		for running {
 			select {
 			case <-ctx.Done():
@@ -48,7 +48,6 @@ func RChan2RWChan(ctx context.Context, inChan <-chan interface{}) chan interface
 				running = ok
 			}
 		}
-		close(outChan)
 	}()
 	return outChan
 }

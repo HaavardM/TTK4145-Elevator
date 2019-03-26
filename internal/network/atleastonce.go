@@ -56,6 +56,9 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 	bSend := make(chan atLeastOnceMsg)
 	bRecv := make(chan atLeastOnceMsg)
 	ret := make(chan atLeastOnceMsg)
+	defer close(bSend)
+	defer close(bRecv)
+	defer close(ret)
 	//Get input channel as a type agnostic interface channel
 	atleastOnceInput, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	recvChan := reflect.ValueOf(conf.Receive)
@@ -161,7 +164,7 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 
 //Send until context ends
 func sendUntilDone(ctx context.Context, content atLeastOnceMsg, send chan<- atLeastOnceMsg, ret chan<- atLeastOnceMsg) {
-	timer := time.NewTicker(1000 * time.Millisecond)
+	timer := time.NewTicker(50 * time.Millisecond)
 	defer timer.Stop()
 	//While not received all acks
 	done := false

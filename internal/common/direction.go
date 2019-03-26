@@ -2,14 +2,20 @@ package common
 
 import "fmt"
 
+//Direction specifies a direction for order or the elevator
 type Direction int
 
 const (
+	//UpDir is the direction upwards
 	UpDir Direction = iota + 1
+	//DownDir is the direction downwards
 	DownDir
+	//NoDir is when no direction is specified.
+	//Typically used by cab orders
 	NoDir
 )
 
+//String returns a string representation of the direction
 func (d Direction) String() string {
 	switch d {
 	case UpDir:

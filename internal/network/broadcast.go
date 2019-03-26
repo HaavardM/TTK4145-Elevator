@@ -18,7 +18,9 @@ type broadcastMsg struct {
 //broadcastReceiver receives JSON messages from a UDP broadcast port and unmarshalls into template
 func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, T reflect.Type) {
 	noConn := make(chan error)
+	defer close(noConn)
 	conn, _, err := createConn(port)
+	//Close connection on exit
 	defer conn.Close()
 
 	if err != nil {
@@ -73,7 +75,9 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 	conn, addr, err := createConn(port)
 	defer conn.Close()
 	if err != nil {
-		noConn <- err
+		go func() {
+			noConn <- err
+		}()
 	}
 	for {
 		select {
