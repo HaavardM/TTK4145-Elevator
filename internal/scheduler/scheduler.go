@@ -186,30 +186,41 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 }
 
 func reassignInvalidOrders(orders *schedOrders, timeout time.Duration, workers map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
-	orderListsToCheck := [][]*SchedulableOrder{orders.OrdersDown, orders.OrdersDown}
+	hallOrders := make([]*SchedulableOrder, 0, len(orders.OrdersDown)+len(orders.OrdersUp))
+	hallOrders = append(hallOrders, orders.OrdersDown...)
+	hallOrders = append(hallOrders, orders.OrdersUp...)
 	//Check for timeout or invalid assignee
-	for _, orderList := range orderListsToCheck {
-		for _, order := range orderList {
-			renewOrder := false
-			if order == nil {
-				continue
-			}
+	for _, order := range hallOrders {
+		renewOrder := false
+		if order == nil {
+			continue
+		}
 
-			//Check if timeout have passed
-			if time.Now().Sub(order.Timestamp) > timeout {
-				renewOrder = true
-			}
+		//Check if timeout have passed
+		if time.Now().Sub(order.Timestamp) > timeout {
+			renewOrder = true
+		}
 
-			//If assignee (elevator id) does not exist
-			if _, ok := workers[order.Worker]; !ok {
-				renewOrder = true
-			}
+		//If assignee (elevator id) does not exist
+		if _, ok := workers[order.Worker]; !ok {
+			renewOrder = true
+		}
 
-			if renewOrder {
-				worker := selectWorker(workers, order.Floor, order.Dir)
-				newOrder := createOrder(order.Floor, order.Dir, worker)
-				sendOrder <- *newOrder
-			}
+		if renewOrder {
+			worker := selectWorker(workers, order.Floor, order.Dir)
+			newOrder := createOrder(order.Floor, order.Dir, worker)
+			sendOrder <- *newOrder
+		}
+	}
+
+	for _, order := range orders.OrdersCab {
+		if order == nil {
+			continue
+		}
+
+		if time.Now().Sub(order.Timestamp) > timeout {
+			log.Printf("Order %v timeout\n", order)
+			order.Timestamp = time.Now()
 		}
 	}
 }
@@ -219,12 +230,12 @@ func sendOrderToElev(elev chan<- common.Order, order common.Order) {
 }
 
 func publishAllHallOrders(orders *schedOrders, send chan<- SchedulableOrder) {
-	for _, order := range orders.OrdersDown {
-		if order != nil {
-			send <- *order
-		}
-	}
-	for _, order := range orders.OrdersUp {
+	//Get hall orders
+	hallOrders := make([]*SchedulableOrder, 0, len(orders.OrdersDown)+len(orders.OrdersUp))
+	hallOrders = append(hallOrders, orders.OrdersDown...)
+	hallOrders = append(hallOrders, orders.OrdersUp...)
+
+	for _, order := range hallOrders {
 		if order != nil {
 			send <- *order
 		}
@@ -283,6 +294,7 @@ func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Dire
 func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *SchedulableOrder {
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
+	//Check cab calls
 	for _, order := range orders.OrdersCab {
 		if order == nil || order.Worker != id {
 			continue
@@ -293,6 +305,8 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 			currOrder = order
 		}
 	}
+
+	//Check down hall orders
 	for _, order := range orders.OrdersDown {
 		if order == nil || order.Worker != id {
 			continue
@@ -303,6 +317,8 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 			currOrder = order
 		}
 	}
+
+	//Check up hall orders
 	for _, order := range orders.OrdersUp {
 		if order == nil || order.Worker != id {
 			continue
