@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"time"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
 
@@ -24,6 +23,8 @@ const (
 	TopicNewOrder int = iota + 1
 	//TopicOrderComplete is an AtLeastOnceTopic used to send order complete msgs
 	TopicOrderComplete
+	//TopicHeartbeat is used to detect other nodes
+	TopicHeartbeat
 )
 
 func main() {
@@ -39,17 +40,24 @@ func main() {
 	elevatorCommand := make(chan elevatordriver.Command)
 	onButtonPress := make(chan elevio.ButtonEvent)
 	lightState := make(chan elevatordriver.LightState)
-	order := make(chan common.Order)
 	orderCompleted := make(chan common.Order)
-	elevatorInfo := make(chan common.ElevatorStatus) //julie
+
+	//Make these buffered to avoid blocking on send
+	//We do not require the scheduler and elevatorcontroller to be in perfect sync,
+	//but the order of the messages sent on these channels must be correct
+	order := make(chan common.Order, 1)
+	elevatorInfo := make(chan common.ElevatorStatus, 1) //julie
 
 	topicNewOrderSend := make(chan scheduler.SchedulableOrder)
 	topicNewOrderRecv := make(chan scheduler.SchedulableOrder)
+	topicNewOrderExpectedAcks := make(chan []int)
 	topicOrderCompleteSend := make(chan scheduler.SchedulableOrder)
 	topicOrderCompleteRecv := make(chan scheduler.SchedulableOrder)
+	topicOrderCompleteExpectedAcks := make(chan []int)
 
-	costSend := make(chan common.OrderCosts)
-	costRecv := make(chan common.OrderCosts)
+	costSend := make(chan common.OrderCosts, 1)
+	costRecv := make(chan common.OrderCosts, 1)
+	workerLost := make(chan int, 1)
 
 	//Create elevator configuration
 	elevatorConf := elevatordriver.Config{
@@ -68,10 +76,9 @@ func main() {
 		ArrivedAtFloor:  arrivedAtFloor,
 		NumberOfFloors:  conf.Floors,
 		OrderCompleted:  orderCompleted,
-		ElevatorInfo:    elevatorInfo, //julie
+		ElevatorStatus:  elevatorInfo, //julie
 	}
 
-	newOrderNodesOnline := make(chan []int)
 	topicNewOrderConf := network.AtLeastOnceConfig{
 		Config: network.Config{
 			Port: conf.BasePort + TopicNewOrder,
@@ -79,10 +86,9 @@ func main() {
 		},
 		Send:        topicNewOrderSend,
 		Receive:     topicNewOrderRecv,
-		NodesOnline: newOrderNodesOnline,
+		NodesOnline: topicNewOrderExpectedAcks,
 	}
 
-	orderCompletedNodesOnline := make(chan []int)
 	topicOrderCompletedConf := network.AtLeastOnceConfig{
 		Config: network.Config{
 			Port: conf.BasePort + TopicOrderComplete,
@@ -90,7 +96,17 @@ func main() {
 		},
 		Send:        topicOrderCompleteSend,
 		Receive:     topicOrderCompleteRecv,
-		NodesOnline: orderCompletedNodesOnline,
+		NodesOnline: topicOrderCompleteExpectedAcks,
+	}
+
+	heartbeatConf := network.HeartbeatConfig{
+		Config: network.Config{
+			ID:   conf.ElevatorID,
+			Port: conf.BasePort + TopicHeartbeat,
+		},
+		CostIn:        costSend,
+		CostOut:       costRecv,
+		LostElevators: workerLost,
 	}
 
 	schedulerConf := scheduler.Config{
@@ -108,6 +124,7 @@ func main() {
 		CostsRecv:          costRecv,
 		ElevExecuteOrder:   order,
 		FolderPath:         conf.FolderPath,
+		WorkerLost:         workerLost,
 	}
 
 	//Launch modules
@@ -118,19 +135,19 @@ func main() {
 	go network.RunAtLeastOnce(ctx, topicNewOrderConf)
 	go network.RunAtLeastOnce(ctx, topicOrderCompletedConf)
 
+	//Create heartbeat module
+	go network.RunHeartbeat(ctx, heartbeatConf, topicNewOrderExpectedAcks, topicOrderCompleteExpectedAcks)
+
 	//Wait for scheduler to complete
 	waitGroup.Add(1)
 	go scheduler.Run(ctx, &waitGroup, schedulerConf)
 
-	go func() {
-		newOrderNodesOnline <- []int{1, 2}
-		orderCompletedNodesOnline <- []int{1, 2}
-	}()
-
-	go func() {
-		time.Sleep(10 * time.Second)
-		log.Panic("SOME PANIC")
-	}()
+	/*
+		go func() {
+			time.Sleep(10 * time.Second)
+			log.Panic("SOME PANIC")
+		}()
+	*/
 
 	//Handle signals to get a graceful shutdown
 	sig := make(chan os.Signal)
@@ -141,7 +158,6 @@ func main() {
 
 	//Wait for important goroutines to exit
 	waitGroup.Wait()
-	fmt.Println("Done")
 	os.Exit(0)
 }
 

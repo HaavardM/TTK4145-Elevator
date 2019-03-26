@@ -69,6 +69,9 @@ func Run(ctx context.Context, config Config) {
 	//Start floor sensor poller
 	go elevio.PollFloorSensor(arrivedAtFloor)
 
+	//Initalize to a stop state
+	handleNewCommand(Stop)
+
 	//Run infite loop until context finishes
 	for {
 		select {
