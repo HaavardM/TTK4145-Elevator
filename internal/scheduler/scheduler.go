@@ -69,10 +69,13 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		},
 	}
 
-	var lastOrder *SchedulableOrder = nil
+	//Stores last sent order to avoid sending duplicates
+	var lastOrder *SchedulableOrder
+
+	orderTimeout := time.NewTicker(20 * time.Second)
 
 	//Channel used to avoid select blocking when neccessary
-	skip := make(chan struct{})
+	skipSelect := make(chan struct{}, 1)
 
 	//Load orders if file exists
 	if fileExists(conf.FolderPath) {
@@ -83,10 +86,11 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		log.Printf("Loading orders from file: %+v\n", fileOrders)
 		spew.Dump(fileOrders)
 		publishAllHallOrders(fileOrders, conf.NewOrderSend)
-		orders.OrdersCab = fileOrders.OrdersCab
-		go func() {
-			skip <- struct{}{}
-		}()
+		//Replace orders with orders from file
+		orders = *fileOrders
+
+		//Skip select to reload orders
+		skipSelect <- struct{}{}
 	}
 
 	//Load system configuration
@@ -96,8 +100,10 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			//Delete orders file on clean exit
 			deleteOrdersFile(conf.FolderPath)
 			return
-		case <-skip:
+		case <-skipSelect:
 			//Continue after select
+		case <-orderTimeout.C:
+			republishInvalidOrders(&orders, time.Minute, costMap, conf.NewOrderSend)
 		case elevatorStatus := <-conf.ElevStatus:
 			if cost, ok := costMap[conf.ElevatorID]; ok {
 				updateElevatorCost(cost, elevatorStatus)
@@ -175,6 +181,35 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		if order != nil && order != lastOrder {
 			lastOrder = order
 			conf.ElevExecuteOrder <- order.Order
+		}
+	}
+}
+
+func republishInvalidOrders(orders *schedOrders, timeout time.Duration, assignees map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
+	orderListsToCheck := [][]*SchedulableOrder{orders.OrdersDown, orders.OrdersDown}
+	//Check for timeout or invalid assignee
+	for _, orderList := range orderListsToCheck {
+		for _, order := range orderList {
+			renewOrder := false
+			if order == nil {
+				continue
+			}
+
+			//Check if timeout have passed
+			if time.Now().Sub(order.Timestamp) > timeout {
+				renewOrder = true
+			}
+
+			//If assignee (elevator id) does not exist
+			if _, ok := assignees[order.Assignee]; !ok {
+				renewOrder = true
+			}
+
+			if renewOrder {
+				assignee := selectAssignee(assignees, order.Floor, order.Dir)
+				newOrder := createOrder(order.Floor, order.Dir, assignee)
+				sendOrder <- *newOrder
+			}
 		}
 	}
 }
@@ -328,10 +363,8 @@ func handleOrderCompleted(orders *schedOrders, order SchedulableOrder) {
 
 func tryAddOrderToSlice(slice []*SchedulableOrder, pos int, order SchedulableOrder) error {
 	if pos >= 0 && pos < len(slice) {
-		if slice[pos] == nil {
-			slice[pos] = &order
-			return nil
-		}
+		slice[pos] = &order
+		return nil
 	}
 	return errors.New("Invalid index")
 }
