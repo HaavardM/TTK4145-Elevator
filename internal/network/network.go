@@ -32,6 +32,9 @@ func createConn(port int) (net.PacketConn, *net.UDPAddr, error) {
 //SendMessage attempts to send a message on a chan
 func SendMessage(ctx context.Context, c interface{}, m interface{}) {
 	channel := reflect.ValueOf(c)
+	if m == nil {
+		log.Panic("This is nil")
+	}
 	msg := reflect.ValueOf(m)
 
 	selectCases := []reflect.SelectCase{
