@@ -70,7 +70,7 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 	}
 }
 
-//
+//broadcastTransmitter transmits JSONs messages to a UDP broadcast port
 func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan interface{}) {
 	noConn := make(chan error)
 	transmitQueue := utilities.RChan2RWChan(ctx, message)
@@ -81,6 +81,7 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 			noConn <- err
 		}()
 	}
+
 	for {
 		select {
 		case <-noConn:
