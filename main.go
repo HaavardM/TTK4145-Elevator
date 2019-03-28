@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"sync"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/network"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/network"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
