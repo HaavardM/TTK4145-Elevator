@@ -82,7 +82,6 @@ func trySendElevatorStatus(c chan<- common.ElevatorStatus, status common.Elevato
 	default:
 		return errors.New("Can't send elevator status - Channel not available")
 	}
-	return errors.New("Unknown error")
 }
 
 //Config used to configure the fsm
@@ -102,16 +101,40 @@ type fsm struct {
 	currentOrder    *common.Order       //common.Order
 	orderCompleted  chan<- common.Order //common.Order
 	status          common.ElevatorStatus
+	statusSend      chan<- common.ElevatorStatus
 }
 
 const doorOpenDuration = 3 * time.Second
 
-func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<- common.Order) *fsm {
+func runSendLatestElevatorStatus(ctx context.Context, send chan<- common.ElevatorStatus, status <-chan common.ElevatorStatus) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		//Wait until there is something to send
+		case msg := <-status:
+			//Try send the status - or overwrite the status with a new one if received
+			select {
+			//Abort if context finished
+			case <-ctx.Done():
+				return
+			//Send order if channel is ready
+			case send <- msg:
+			//Update order to send if a new one is received before the sendChan is ready
+			case msg = <-status:
+			}
+		}
+	}
+
+}
+
+func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<- common.Order, statusSend chan<- common.ElevatorStatus) *fsm {
 	temp := &fsm{
 		state:           stateDoorClosed,
 		timer:           time.NewTimer(doorOpenDuration),
 		elevatorCommand: elevatorCommand,
 		orderCompleted:  orderCompleted,
+		statusSend:      statusSend,
 	}
 	if !(temp.timer.Stop()) {
 		<-temp.timer.C
@@ -133,8 +156,13 @@ func Test(ctx context.Context, conf Config) {
 
 //Run starts the elevatorcontroller fsm
 func Run(ctx context.Context, conf Config) {
-	fsm := newFSM(conf.ElevatorCommand, conf.OrderCompleted)
+	//Create elevator status publisher
+	elevatorStatus := make(chan common.ElevatorStatus)
+	go runSendLatestElevatorStatus(ctx, conf.ElevatorStatus, elevatorStatus)
+
+	fsm := newFSM(conf.ElevatorCommand, conf.OrderCompleted, elevatorStatus)
 	fsm.init(conf)
+
 	for {
 		select {
 		case order := <-conf.Order:
@@ -201,7 +229,7 @@ func (f *fsm) orderAbove(floor int) bool {
 
 //Handles events that occur when reaching a new floow
 func (f *fsm) handleAtFloor(conf Config) { //julie
-	if err := trySendElevatorStatus(conf.ElevatorStatus, f.status); err != nil {
+	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
 		log.Println(err)
 	}
 	switch f.state {
@@ -247,7 +275,7 @@ func (f *fsm) transitionToMovingDown(conf Config) { //julie
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.DownDir
-	if err := trySendElevatorStatus(conf.ElevatorStatus, f.status); err != nil {
+	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
 		log.Println(err)
 	}
 	fmt.Println(f.status)
@@ -261,7 +289,7 @@ func (f *fsm) transitionToMovingUp(conf Config) { //julie
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.UpDir
 	log.Println("Start")
-	if err := trySendElevatorStatus(conf.ElevatorStatus, f.status); err != nil {
+	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
 		log.Println(err)
 	}
 	log.Println("End")

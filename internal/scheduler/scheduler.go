@@ -54,7 +54,7 @@ type schedOrders struct {
 //If for some reason the scheduler generates orders faster than the elevatorcontroller
 //we want to only send the latest one when the channel is ready.
 //Sending the message using multiple goroutines wouldn't help since the order of the messages is important
-func runSendLatestMessage(ctx context.Context, sendChan chan<- common.Order, orderToSend <-chan common.Order) {
+func runSendLatestOrder(ctx context.Context, sendChan chan<- common.Order, orderToSend <-chan common.Order) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -110,7 +110,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 	//The runSkipOldOrders acts as a "middleman", storing the latest order and sends it when
 	//the elevatorcontroller is ready.
 	orderToElevator := make(chan common.Order)
-	go runSendLatestMessage(ctx, conf.ElevExecuteOrder, orderToElevator)
+	go runSendLatestOrder(ctx, conf.ElevExecuteOrder, orderToElevator)
 
 	//Load orders if file exists
 	if fileExists(conf.FolderPath) {
