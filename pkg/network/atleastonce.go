@@ -122,7 +122,7 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 				m.Ack = true
 				m.SenderID = conf.ID
 				bSend <- m
-				go SendMessage(ctx, ret, m)
+				go utilities.SendMessage(ctx, ret, m)
 			}
 		//Set nodesOnline to updated value
 		case nodesOnline = <-conf.NodesOnline:

@@ -137,3 +137,25 @@ func ConstantPublisher(ctx context.Context, channel interface{}, value interface
 		}
 	}
 }
+
+//SendMessage attempts to send a message on a chan
+func SendMessage(ctx context.Context, c interface{}, m interface{}) {
+	channel := reflect.ValueOf(c)
+	if m == nil {
+		log.Panic("This is nil")
+	}
+	msg := reflect.ValueOf(m)
+
+	selectCases := []reflect.SelectCase{
+		reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(ctx.Done()),
+		},
+		reflect.SelectCase{
+			Dir:  reflect.SelectSend,
+			Chan: channel,
+			Send: msg,
+		},
+	}
+	reflect.Select(selectCases)
+}
