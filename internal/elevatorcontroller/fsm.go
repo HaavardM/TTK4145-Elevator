@@ -20,6 +20,7 @@ const (
 
 type state int
 
+//Returns a string representation of the elevator state
 func (s state) String() string {
 	switch s {
 	case stateMovingUp:
@@ -35,45 +36,11 @@ func (s state) String() string {
 	default:
 		return "Unrecognized state"
 	}
-
 }
 
-/*//Direction used to define preferred elevator direction
-type Direction int
+const doorOpenDuration = 3 * time.Second
 
-const (
-	//UP direction
-	UP Direction = iota + 1
-	//DOWN direction
-	DOWN
-	//NoDirection implies direction not important
-	NoDirection
-)
-
-type Elevatorstatus struct {
-	ElevatorDir		Direction
-	ElevatorFloor	int
-}
-
-func (d Direction) String() string {
-	switch d {
-	case UP:
-		return "UP"
-	case DOWN:
-		return "DOWN"
-	case NoDirection:
-		return "NO DIRECTION"
-	default:
-		return "Unrecognized direction"
-	}
-}
-
-//Order contains information about an elevator order
-type Order struct {
-	Dir   Direction
-	Floor int
-}*/
-
+//Sends information about the elevators position and direction so it is available for other modules
 func sendElevatorStatus(c chan<- common.ElevatorStatus, status common.ElevatorStatus) {
 	c <- status
 }
@@ -81,24 +48,24 @@ func sendElevatorStatus(c chan<- common.ElevatorStatus, status common.ElevatorSt
 //Config used to configure the fsm
 type Config struct {
 	ElevatorCommand chan<- elevatordriver.Command
-	Order           chan common.Order //common.Order
+	Order           chan common.Order
 	ArrivedAtFloor  <-chan int
 	NumberOfFloors  int
-	OrderCompleted  chan common.Order //common.Order
+	OrderCompleted  chan common.Order
 	ElevatorStatus  chan<- common.ElevatorStatus
 }
 
+//Struct containing variables and channels used by the statemachine
 type fsm struct {
 	state           state
 	timer           *time.Timer
 	elevatorCommand chan<- elevatordriver.Command
-	currentOrder    *common.Order       //common.Order
-	orderCompleted  chan<- common.Order //common.Order
+	currentOrder    *common.Order
+	orderCompleted  chan<- common.Order
 	status          common.ElevatorStatus
 }
 
-const doorOpenDuration = 3 * time.Second
-
+//Function initializing the fsm variables
 func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<- common.Order) *fsm {
 	temp := &fsm{
 		state:           stateDoorClosed,
@@ -110,18 +77,6 @@ func newFSM(elevatorCommand chan<- elevatordriver.Command, orderCompleted chan<-
 		<-temp.timer.C
 	}
 	return temp
-}
-
-func Test(ctx context.Context, conf Config) {
-	firstOrder := common.Order{common.UpDir, 2}
-	conf.Order <- firstOrder
-	for {
-		select {
-		case <-conf.OrderCompleted:
-			secondOrder := common.Order{common.DownDir, 1}
-			conf.Order <- secondOrder
-		}
-	}
 }
 
 //Run starts the elevatorcontroller fsm
@@ -143,17 +98,27 @@ func Run(ctx context.Context, conf Config) {
 	}
 }
 
+
+//Initializes elevator when starting up so that it knows where it is
+func (f *fsm) init(conf Config) {
+	f.elevatorCommand <- elevatordriver.MoveUp
+	f.status.Floor = <-conf.ArrivedAtFloor
+	f.elevatorCommand <- elevatordriver.Stop
+}
+
+
 //Handles incomming orders from the scheduler module
 func (f *fsm) handleNewOrders(conf Config) {
 
 	if f.currentOrder == nil {
 		return
 	}
-
+	//Initializes variables for the statemachine
 	targetFloor := f.currentOrder.Floor
 	currentFloor := f.status.Floor
 	targetDir := f.currentOrder.Dir
 
+	//Elevator out of range
 	if (targetDir == common.UpDir && targetFloor >= conf.NumberOfFloors) || (targetDir == common.DownDir && targetFloor <= 0) {
 		log.Panic()
 	}
@@ -183,17 +148,9 @@ func (f *fsm) handleNewOrders(conf Config) {
 	}
 }
 
-//Checking if new order is above or below current floor of the elevator
-func (f *fsm) orderAbove(floor int) bool {
-	targetFloor := f.currentOrder.Floor
-	if targetFloor > floor {
-		return true
-	}
-	return false
-}
 
 //Handles events that occur when reaching a new floow
-func (f *fsm) handleAtFloor(conf Config) { //julie
+func (f *fsm) handleAtFloor(conf Config) {
 	sendElevatorStatus(conf.ElevatorStatus, f.status)
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
@@ -224,16 +181,8 @@ func (f *fsm) transitionToDoorClosed() {
 	}
 }
 
-//Handles events when door-open-timer has elapsed
-func (f *fsm) handleTimerElapsed() {
-	switch f.state {
-	case stateDoorOpen:
-		f.transitionToDoorClosed()
-	}
-}
-
 //handles transition from one state to moving down
-func (f *fsm) transitionToMovingDown(conf Config) { //julie
+func (f *fsm) transitionToMovingDown(conf Config) {
 	log.Println("Transition to moving down")
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
@@ -244,7 +193,7 @@ func (f *fsm) transitionToMovingDown(conf Config) { //julie
 }
 
 //Handles transition from one state to moving up
-func (f *fsm) transitionToMovingUp(conf Config) { //julie
+func (f *fsm) transitionToMovingUp(conf Config) {
 	log.Println("Transition to moving up")
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
@@ -255,12 +204,15 @@ func (f *fsm) transitionToMovingUp(conf Config) { //julie
 	f.state = stateMovingUp
 }
 
-//Initializes elevator when starting up
-func (f *fsm) init(conf Config) {
-	f.elevatorCommand <- elevatordriver.MoveUp
-	f.status.Floor = <-conf.ArrivedAtFloor
-	f.elevatorCommand <- elevatordriver.Stop
+//Checking if new order is above or below current floor of the elevator
+func (f *fsm) orderAbove(floor int) bool {
+	targetFloor := f.currentOrder.Floor
+	if targetFloor > floor {
+		return true
+	}
+	return false
 }
+
 
 //Checks if we have reached target floor or not
 func (f *fsm) shouldStop(floor int) bool {
@@ -268,4 +220,13 @@ func (f *fsm) shouldStop(floor int) bool {
 		return true
 	}
 	return false
+}
+
+
+//Handles switching of state when door-open-timer has elapsed
+func (f *fsm) handleTimerElapsed() {
+	switch f.state {
+	case stateDoorOpen:
+		f.transitionToDoorClosed()
+	}
 }
