@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/xid"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 )
 
 type atLeastOnceMsg struct {
@@ -56,6 +56,9 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 	bSend := make(chan atLeastOnceMsg)
 	bRecv := make(chan atLeastOnceMsg)
 	ret := make(chan atLeastOnceMsg)
+	defer close(bSend)
+	defer close(bRecv)
+	defer close(ret)
 	//Get input channel as a type agnostic interface channel
 	atleastOnceInput, err := utilities.ReflectChan2InterfaceChan(ctx, reflect.ValueOf(conf.Send))
 	recvChan := reflect.ValueOf(conf.Receive)
@@ -113,15 +116,13 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 			if m.Ack {
 				if idSet, ok := acks[m.MessageID]; ok {
 					idSet[m.SenderID] = struct{}{}
-				} else {
-					log.Printf("Received ack for non existent message %v\n", m)
 				}
 			} else {
 				//Send ACK
 				m.Ack = true
 				m.SenderID = conf.ID
 				bSend <- m
-				go SendMessage(ctx, ret, m)
+				go utilities.SendMessage(ctx, ret, m)
 			}
 		//Set nodesOnline to updated value
 		case nodesOnline = <-conf.NodesOnline:
@@ -161,10 +162,11 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 
 //Send until context ends
 func sendUntilDone(ctx context.Context, content atLeastOnceMsg, send chan<- atLeastOnceMsg, ret chan<- atLeastOnceMsg) {
-	timer := time.NewTicker(1000 * time.Millisecond)
+	timer := time.NewTicker(50 * time.Millisecond)
 	defer timer.Stop()
 	//While not received all acks
 	done := false
+
 	for !done {
 		select {
 		case <-ctx.Done():

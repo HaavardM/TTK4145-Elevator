@@ -37,13 +37,6 @@ const (
 	//Stop stops the motor
 	Stop
 
-	/*****************************Events*****************************/
-
-	//StopPressed indicates the stop button have been pressed
-	StopPressed Event = iota + 1
-	//StopReleased indicates the stop button have been released
-	StopReleased
-
 	/****************************Button Types************************/
 
 	//UpButtonLight is the floor order buttons upwards
@@ -62,14 +55,12 @@ type Config struct {
 	NumberOfFloors int
 	Commands       <-chan Command
 	SetStatusLight <-chan LightState
-	Events         chan<- Event
 	ArrivedAtFloor chan<- int
 	OnButtonPress  chan<- elevio.ButtonEvent
 }
 
 //Run runs the elevator driver module
 func Run(ctx context.Context, config Config) {
-	stopSignal := make(chan bool)
 	arrivedAtFloor := make(chan int)
 	//Initialize elevio module
 	elevio.Init(config.Address, config.NumberOfFloors)
@@ -77,8 +68,9 @@ func Run(ctx context.Context, config Config) {
 	go elevio.PollButtons(config.OnButtonPress)
 	//Start floor sensor poller
 	go elevio.PollFloorSensor(arrivedAtFloor)
-	//Start stop button poller
-	go elevio.PollStopButton(stopSignal)
+
+	//Initalize to a stop state
+	handleNewCommand(Stop)
 
 	//Run infite loop until context finishes
 	for {
@@ -87,25 +79,16 @@ func Run(ctx context.Context, config Config) {
 			handleNewCommand(c)
 		case l := <-config.SetStatusLight:
 			handleNewLightState(l)
-		case s := <-stopSignal:
-			config.Events <- getStopEvent(s)
 		case f := <-arrivedAtFloor:
 			elevio.SetFloorIndicator(f)
 			config.ArrivedAtFloor <- f
 		case <-ctx.Done():
 			break
-		default:
 		}
 	}
 }
 
-func getStopEvent(s bool) Event {
-	if s {
-		return StopPressed
-	}
-	return StopReleased
-}
-
+//Adapts the incoming commands for the hardware
 func handleNewCommand(cmd Command) error {
 	switch cmd {
 	case CloseDoor:
@@ -124,6 +107,7 @@ func handleNewCommand(cmd Command) error {
 	return nil
 }
 
+//Handles change in light state(on/off)
 func handleNewLightState(light LightState) error {
 	switch light.Type {
 	case UpButtonLight:

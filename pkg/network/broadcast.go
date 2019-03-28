@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 )
 
 type broadcastMsg struct {
@@ -18,7 +18,9 @@ type broadcastMsg struct {
 //broadcastReceiver receives JSON messages from a UDP broadcast port and unmarshalls into template
 func broadcastReceiver(ctx context.Context, port int, id int, message chan<- interface{}, T reflect.Type) {
 	noConn := make(chan error)
+	defer close(noConn)
 	conn, _, err := createConn(port)
+	//Close connection on exit
 	defer conn.Close()
 
 	if err != nil {
@@ -60,21 +62,26 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 			log.Println(err)
 		}
 		if msg.SenderID != id || msg.SenderID < 0 {
-			go SendMessage(ctx, message, msg.Data)
+			if msg.Data != nil {
+				go utilities.SendMessage(ctx, message, msg.Data)
+			}
 		}
 
 	}
 }
 
-//
+//broadcastTransmitter transmits JSONs messages to a UDP broadcast port
 func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan interface{}) {
 	noConn := make(chan error)
 	transmitQueue := utilities.RChan2RWChan(ctx, message)
 	conn, addr, err := createConn(port)
 	defer conn.Close()
 	if err != nil {
-		noConn <- err
+		go func() {
+			noConn <- err
+		}()
 	}
+
 	for {
 		select {
 		case <-noConn:
@@ -102,9 +109,9 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 			_, err = conn.WriteTo(data, addr)
 			if err != nil {
 				log.Println("Failed to write - attempting reconnect")
-				noConn <- err
+				go utilities.SendMessage(ctx, noConn, err)
 				//Do not skip message
-				go SendMessage(ctx, transmitQueue, m)
+				go utilities.SendMessage(ctx, transmitQueue, m)
 			}
 		}
 	}
