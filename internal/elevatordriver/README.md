@@ -4,5 +4,5 @@ The elevator driver adapts commands for setting lights, motors etc. in Golang so
 
 Used Packages
 --------------
-"context": 	to to stop the goroutine if the context expires
-"errors":	to handle errors if they occur
+- "context": 	to to stop the goroutine if the context expires
+- "errors":	to handle errors if they occur

@@ -10,13 +10,13 @@ Module: Scheduler
 Used Packages
 ---------------
 In this several golang packages have been used
-"time": 							to make deadlines for orders
-"math": 							to assign infinite values for comparison of cheapest elevator cost
-"context":							to stop the goroutine if the context expires
-"sync":								to make sure the main routine waits for this goroutine to finish
-"encoding/json":					to convert structs of orders into json format before saving to file, and then convert back before reading them again.
-"io/ioutil":						to be able to read the json-files
-"os":								to open the json-files
-"github.com/davecgh/go-spew/spew":	to format the data types	
-"errors":							to handle errors if they occur
+- "time": 							to make deadlines for orders
+- "math": 							to assign infinite values for comparison of cheapest elevator cost
+- "context":							to stop the goroutine if the context expires
+- "sync":								to make sure the main routine waits for this goroutine to finish
+- "encoding/json":					to convert structs of orders into json format before saving to file, and then convert back before reading them again.
+- "io/ioutil":						to be able to read the json-files
+- "os":								to open the json-files
+- "github.com/davecgh/go-spew/spew":	to format the data types	
+- "errors":							to handle errors if they occur
 	
