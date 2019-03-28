@@ -166,6 +166,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			case common.DownDir:
 				schedOrder := orders.OrdersDown[order.Floor]
 				if schedOrder != nil {
+					//Send order completed event to network when available
 					go utilities.SendMessage(ctx, conf.OrderCompletedSend, *schedOrder)
 				} else {
 					log.Println("Unexpected order completed")
@@ -173,6 +174,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			case common.UpDir, common.NoDir:
 				schedOrder := orders.OrdersUp[order.Floor]
 				if schedOrder != nil {
+					//Send order completed event to network when available
 					go utilities.SendMessage(ctx, conf.OrderCompletedSend, *schedOrder)
 				} else {
 					log.Println("Unexpected order completed")
@@ -254,6 +256,7 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 		if renewOrder {
 			worker := selectWorker(workers, order.Floor, order.Dir)
 			newOrder := createOrder(order.Floor, order.Dir, worker)
+			//Send new order event to network when available
 			go utilities.SendMessage(ctx, sendOrder, *newOrder)
 		}
 	}
@@ -278,6 +281,7 @@ func publishAllHallOrders(ctx context.Context, orders *schedOrders, send chan<- 
 
 	for _, order := range hallOrders {
 		if order != nil {
+			//Send order to network when available
 			go utilities.SendMessage(ctx, send, *order)
 		}
 	}
@@ -288,10 +292,12 @@ func handleElevHallBtnPressed(ctx context.Context, btn elevio.ButtonEvent, costM
 	case elevio.BT_HallDown:
 		worker := selectWorker(costMap, btn.Floor, common.DownDir)
 		order := createOrder(btn.Floor, common.DownDir, worker)
+		//Send new order to network when available
 		go utilities.SendMessage(ctx, sendOrder, *order)
 	case elevio.BT_HallUp:
 		worker := selectWorker(costMap, btn.Floor, common.UpDir)
 		order := createOrder(btn.Floor, common.UpDir, worker)
+		//Send new order to network when available
 		go utilities.SendMessage(ctx, sendOrder, *order)
 	default:
 		log.Panic("Invalid button type")
