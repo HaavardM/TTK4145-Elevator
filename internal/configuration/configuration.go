@@ -24,6 +24,7 @@ func GetConfig() Config {
 	if err != nil {
 		log.Panic(err)
 	}
+
 	flag.IntVar(&conf.ElevatorID, "id", -1, "Elevator ID")
 	flag.IntVar(&conf.BasePort, "baseport", 2000, "Base network UDP port")
 	flag.IntVar(&conf.ElevatorPort, "elevator-port", 15657, "Port for elevator server")

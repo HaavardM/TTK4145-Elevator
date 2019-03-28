@@ -12,7 +12,7 @@ import (
 const heartbInterval = 50 * time.Millisecond
 const timeout = 10 * heartbInterval
 
-//HeartbeatConfig contains config params for the heartbeat module
+//HeartbeatConfig contains config parameters for the heartbeat module
 type HeartbeatConfig struct {
 	Config
 	CostIn          <-chan common.OrderCosts
@@ -21,6 +21,7 @@ type HeartbeatConfig struct {
 	OnlineElevators chan<- []int
 }
 
+//stampedHeartbeat contains a heartbeat and a timestamp of when the heartbeat was last updated
 type stampedHeartbeat struct {
 	timestamp time.Time
 	hbt       common.OrderCosts
@@ -93,6 +94,7 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 	}
 }
 
+//publishNodesOnline finds all the online nodes going through the sampedHeartbeat map and publish them an array
 func publishNodesOnline(mapLastHeartbeat map[int]stampedHeartbeat, sends ...chan<- []int) {
 	for _, c := range sends {
 		msg := []int{}
