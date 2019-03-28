@@ -7,7 +7,7 @@ Folder structure
 ----------------
 | Folder | Description |
 |--------|-------------|
-|pkg     | Contains independent modules that can be used in other projects without any modifications. Can not depend on internal project modules |
+|pkg     | Contains independent modules that can be used in other projects without any modifications. Modules in this folder can not depend on internal project modules. |
 | internal | Contains internal modules. It is not possible to import these modules from external projects.
 | scripts | Scripts used to launch, test and build the code |
 
