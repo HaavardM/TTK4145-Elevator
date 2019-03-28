@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
+
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
@@ -32,6 +34,7 @@ type Config struct {
 	ElevCompletedOrder <-chan common.Order
 	ElevExecuteOrder   chan<- common.Order
 	ElevStatus         <-chan common.ElevatorStatus
+	//Sets light state - assumed non-blocking
 	Lights             chan<- elevatordriver.LightState
 	NewOrderSend       chan<- SchedulableOrder
 	NewOrderRecv       <-chan SchedulableOrder
@@ -46,6 +49,31 @@ type schedOrders struct {
 	OrdersUp   []*SchedulableOrder `json:"orders_up"`
 	OrdersDown []*SchedulableOrder `json:"orders_down"`
 	OrdersCab  []*SchedulableOrder `json:"orders_cab"`
+}
+
+//If for some reason the scheduler generates orders faster than the elevatorcontroller
+//we want to only send the latest one when the channel is ready.
+//Sending the message using multiple goroutines wouldn't help since the order of the messages is important
+func runSendLatestMessage(ctx context.Context, sendChan chan<- common.Order, orderToSend <-chan common.Order) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		//Wait until there is something to send
+		case order := <-orderToSend:
+			//Try send the order - or overwrite the order with a new one if received
+			select {
+			//Abort if context finished
+			case <-ctx.Done():
+				return
+			//Send order if channel is ready
+			case sendChan <- order:
+			//Update order to send if a new one is received before the sendChan is ready
+			case order = <-orderToSend:
+			}
+		}
+	}
+
 }
 
 //Run is the startingpoint for the scheduler module
@@ -78,6 +106,12 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 	//Channel used to avoid select blocking when neccessary
 	skipSelect := make(chan struct{}, 1)
 
+	//To avoid deadlocking, we do not want to block the main scheduler thread.
+	//The runSkipOldOrders acts as a "middleman", storing the latest order and sends it when
+	//the elevatorcontroller is ready.
+	orderToElevator := make(chan common.Order)
+	go runSendLatestMessage(ctx, conf.ElevExecuteOrder, orderToElevator)
+
 	//Load orders if file exists
 	if fileExists(conf.FolderPath) {
 		fileOrders, err := readFromOrdersFile(conf.FolderPath)
@@ -86,7 +120,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		}
 		log.Printf("Loading orders from file: %+v\n", fileOrders)
 		spew.Dump(fileOrders)
-		publishAllHallOrders(fileOrders, conf.NewOrderSend)
+		publishAllHallOrders(ctx, fileOrders, conf.NewOrderSend)
 		//Replace orders with orders from file
 		orders = *fileOrders
 
@@ -96,8 +130,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 
 	go sendOrderCosts(conf.CostsSend, workers[conf.ElevatorID])
 
-	//Load system configuration
 	for {
+		//All blocking operations handled in select!
 		select {
 		case <-ctx.Done():
 			//Delete orders file on clean exit
@@ -107,13 +141,14 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			//Continue after select
 		case id := <-conf.WorkerLost:
 			delete(workers, id)
-			reassignInvalidOrders(&orders, time.Minute, workers, conf.NewOrderSend)
+			reassignInvalidOrders(ctx, &orders, time.Minute, workers, conf.NewOrderSend)
 		case <-orderTimeout.C:
-			reassignInvalidOrders(&orders, time.Minute, workers, conf.NewOrderSend)
+			reassignInvalidOrders(ctx, &orders, time.Minute, workers, conf.NewOrderSend)
 		case elevatorStatus := <-conf.ElevStatus:
 			if cost, ok := workers[conf.ElevatorID]; ok {
 				updateElevatorCost(conf, cost, elevatorStatus)
 				//Send cost using deep copy
+				//Not critical if multiple of these are sent in wrong order
 				go sendOrderCosts(conf.CostsSend, cost)
 			} else {
 				log.Panicf("Missing elevator cost in costmap")
@@ -131,14 +166,14 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			case common.DownDir:
 				schedOrder := orders.OrdersDown[order.Floor]
 				if schedOrder != nil {
-					conf.OrderCompletedSend <- *schedOrder
+					go utilities.SendMessage(ctx, conf.OrderCompletedSend, *schedOrder)
 				} else {
 					log.Println("Unexpected order completed")
 				}
 			case common.UpDir, common.NoDir:
 				schedOrder := orders.OrdersUp[order.Floor]
 				if schedOrder != nil {
-					conf.OrderCompletedSend <- *schedOrder
+					go utilities.SendMessage(ctx, conf.OrderCompletedSend, *schedOrder)
 				} else {
 					log.Println("Unexpected order completed")
 				}
@@ -153,7 +188,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 					orders.OrdersCab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
 				}
 			} else {
-				handleElevUpDownBtnPressed(btn, workers, conf.NewOrderSend)
+				handleElevHallBtnPressed(ctx, btn, workers, conf.NewOrderSend)
 			}
 		}
 
@@ -169,6 +204,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			if floor >= conf.NumFloors {
 				continue
 			}
+			//Receiver never blocks
 			conf.Lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.UpButtonLight, State: (order != nil)}
 		}
 		for floor, order := range orders.OrdersDown {
@@ -176,9 +212,11 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			if floor <= 0 {
 				continue
 			}
+			//Receiver never blocks
 			conf.Lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.DownButtonLight, State: (order != nil)}
 		}
 		for floor, order := range orders.OrdersCab {
+			//Receiver never blocks
 			conf.Lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.InternalButtonLight, State: (order != nil)}
 		}
 
@@ -186,12 +224,13 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		order := findHighestPriority(&orders, workers[conf.ElevatorID], conf.ElevatorID)
 		if order != nil && order != lastOrder {
 			lastOrder = order
-			conf.ElevExecuteOrder <- order.Order
+			//Guranteed to not block by the receiver runSkipOldOrders
+			orderToElevator <- order.Order
 		}
 	}
 }
 
-func reassignInvalidOrders(orders *schedOrders, timeout time.Duration, workers map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
+func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout time.Duration, workers map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
 	hallOrders := make([]*SchedulableOrder, 0, len(orders.OrdersDown)+len(orders.OrdersUp))
 	hallOrders = append(hallOrders, orders.OrdersDown...)
 	hallOrders = append(hallOrders, orders.OrdersUp...)
@@ -215,7 +254,7 @@ func reassignInvalidOrders(orders *schedOrders, timeout time.Duration, workers m
 		if renewOrder {
 			worker := selectWorker(workers, order.Floor, order.Dir)
 			newOrder := createOrder(order.Floor, order.Dir, worker)
-			sendOrder <- *newOrder
+			go utilities.SendMessage(ctx, sendOrder, *newOrder)
 		}
 	}
 
@@ -231,11 +270,7 @@ func reassignInvalidOrders(orders *schedOrders, timeout time.Duration, workers m
 	}
 }
 
-func sendOrderToElev(elev chan<- common.Order, order common.Order) {
-	elev <- order
-}
-
-func publishAllHallOrders(orders *schedOrders, send chan<- SchedulableOrder) {
+func publishAllHallOrders(ctx context.Context, orders *schedOrders, send chan<- SchedulableOrder) {
 	//Get hall orders
 	hallOrders := make([]*SchedulableOrder, 0, len(orders.OrdersDown)+len(orders.OrdersUp))
 	hallOrders = append(hallOrders, orders.OrdersDown...)
@@ -243,21 +278,21 @@ func publishAllHallOrders(orders *schedOrders, send chan<- SchedulableOrder) {
 
 	for _, order := range hallOrders {
 		if order != nil {
-			send <- *order
+			go utilities.SendMessage(ctx, send, *order)
 		}
 	}
 }
 
-func handleElevUpDownBtnPressed(btn elevio.ButtonEvent, costMap map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
+func handleElevHallBtnPressed(ctx context.Context, btn elevio.ButtonEvent, costMap map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
 	switch btn.Button {
 	case elevio.BT_HallDown:
 		worker := selectWorker(costMap, btn.Floor, common.DownDir)
 		order := createOrder(btn.Floor, common.DownDir, worker)
-		sendOrder <- *order
+		go utilities.SendMessage(ctx, sendOrder, *order)
 	case elevio.BT_HallUp:
 		worker := selectWorker(costMap, btn.Floor, common.UpDir)
 		order := createOrder(btn.Floor, common.UpDir, worker)
-		sendOrder <- *order
+		go utilities.SendMessage(ctx, sendOrder, *order)
 	default:
 		log.Panic("Invalid button type")
 	}

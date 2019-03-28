@@ -2,6 +2,7 @@ package elevatorcontroller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -74,8 +75,14 @@ type Order struct {
 	Floor int
 }*/
 
-func sendElevatorStatus(c chan<- common.ElevatorStatus, status common.ElevatorStatus) {
-	c <- status
+func trySendElevatorStatus(c chan<- common.ElevatorStatus, status common.ElevatorStatus) error {
+	select {
+	case c <- status:
+		return nil
+	default:
+		return errors.New("Can't send elevator status - Channel not available")
+	}
+	return errors.New("Unknown error")
 }
 
 //Config used to configure the fsm
@@ -194,7 +201,9 @@ func (f *fsm) orderAbove(floor int) bool {
 
 //Handles events that occur when reaching a new floow
 func (f *fsm) handleAtFloor(conf Config) { //julie
-	sendElevatorStatus(conf.ElevatorStatus, f.status)
+	if err := trySendElevatorStatus(conf.ElevatorStatus, f.status); err != nil {
+		log.Println(err)
+	}
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
 		if f.shouldStop(f.status.Floor) {
@@ -238,7 +247,9 @@ func (f *fsm) transitionToMovingDown(conf Config) { //julie
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.DownDir
-	sendElevatorStatus(conf.ElevatorStatus, f.status)
+	if err := trySendElevatorStatus(conf.ElevatorStatus, f.status); err != nil {
+		log.Println(err)
+	}
 	fmt.Println(f.status)
 	f.state = stateMovingDown
 }
@@ -250,7 +261,9 @@ func (f *fsm) transitionToMovingUp(conf Config) { //julie
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.UpDir
 	log.Println("Start")
-	sendElevatorStatus(conf.ElevatorStatus, f.status)
+	if err := trySendElevatorStatus(conf.ElevatorStatus, f.status); err != nil {
+		log.Println(err)
+	}
 	log.Println("End")
 	f.state = stateMovingUp
 }
