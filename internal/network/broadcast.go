@@ -63,7 +63,7 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 		}
 		if msg.SenderID != id || msg.SenderID < 0 {
 			if msg.Data != nil {
-				go SendMessage(ctx, message, msg.Data)
+				go utilities.SendMessage(ctx, message, msg.Data)
 			}
 		}
 
@@ -109,9 +109,9 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 			_, err = conn.WriteTo(data, addr)
 			if err != nil {
 				log.Println("Failed to write - attempting reconnect")
-				go SendMessage(ctx, noConn, err)
+				go utilities.SendMessage(ctx, noConn, err)
 				//Do not skip message
-				go SendMessage(ctx, transmitQueue, m)
+				go utilities.SendMessage(ctx, transmitQueue, m)
 			}
 		}
 	}

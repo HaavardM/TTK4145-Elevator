@@ -1,11 +1,9 @@
 package network
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net"
-	"reflect"
 
 	"github.com/TTK4145/Network-go/network/conn"
 )
@@ -27,26 +25,4 @@ func createConn(port int) (net.PacketConn, *net.UDPAddr, error) {
 		return nil, nil, err
 	}
 	return conn, addr, nil
-}
-
-//SendMessage attempts to send a message on a chan
-func SendMessage(ctx context.Context, c interface{}, m interface{}) {
-	channel := reflect.ValueOf(c)
-	if m == nil {
-		log.Panic("This is nil")
-	}
-	msg := reflect.ValueOf(m)
-
-	selectCases := []reflect.SelectCase{
-		reflect.SelectCase{
-			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(ctx.Done()),
-		},
-		reflect.SelectCase{
-			Dir:  reflect.SelectSend,
-			Chan: channel,
-			Send: msg,
-		},
-	}
-	reflect.Select(selectCases)
 }
