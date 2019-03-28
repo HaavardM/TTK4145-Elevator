@@ -2,11 +2,10 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"reflect"
-
-	"fmt"
 
 	"github.com/TTK4145/Network-go/network/conn"
 )
@@ -19,6 +18,7 @@ type Config struct {
 	Port int
 }
 
+//createConn creates an UDP broadcast connection and finds the connection address
 func createConn(port int) (net.PacketConn, *net.UDPAddr, error) {
 	conn := conn.DialBroadcastUDP(port)
 	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
