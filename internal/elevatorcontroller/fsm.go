@@ -71,8 +71,6 @@ type fsm struct {
 	statusSend      chan<- common.ElevatorStatus
 }
 
-const doorOpenDuration = 3 * time.Second
-
 func runSendLatestElevatorStatus(ctx context.Context, send chan<- common.ElevatorStatus, status <-chan common.ElevatorStatus) {
 	for {
 		select {
