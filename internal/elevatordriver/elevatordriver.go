@@ -84,7 +84,6 @@ func Run(ctx context.Context, config Config) {
 			config.ArrivedAtFloor <- f
 		case <-ctx.Done():
 			break
-		default:
 		}
 	}
 }
