@@ -3,6 +3,15 @@ Elevator Project
 
 [![Build Status](https://build.shapingideas.fyi/job/thefuturezebras/job/project-thefuturezebras/job/master/2/badge/icon)](https://build.shapingideas.fyi/job/thefuturezebras/job/project-thefuturezebras/job/master/2/)
 
+Folder structure
+----------------
+| Folder | Description |
+|--------|-------------|
+|pkg     | Contains independent modules that can be used in other projects without any modifications. Can not depend on internal project modules |
+| internal | Contains internal modules. It is not possible to import these modules from external projects.
+| scripts | Scripts used to launch, test and build the code |
+
+
 Summary
 -------
 In this project we have created software for controlling `n` elevators working in parallel across `m` floors.

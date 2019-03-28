@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 )
 
 type broadcastMsg struct {

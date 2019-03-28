@@ -5,7 +5,7 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 )
 
 //AtMostOnceConfig is a configuration struct used to configure atMostOnce

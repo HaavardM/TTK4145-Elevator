@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/utilities"
+	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 
 	"github.com/davecgh/go-spew/spew"
 
