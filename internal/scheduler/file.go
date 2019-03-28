@@ -9,8 +9,6 @@ import (
 
 const fileSubPath string = "/orders.json"
 
-//need to configure Filepath!!
-
 //turning an array of orders into json format before saving to a file. Saves to temporary file before
 //overwriting to make sure no data is lost if an error occurs.
 func saveToOrdersFile(folderPath string, currentOrders *schedOrders) error {
@@ -31,7 +29,10 @@ func saveToOrdersFile(folderPath string, currentOrders *schedOrders) error {
 	return nil
 }
 
+
+//Reads orders from a file and turn them back into an array of Order type from json format
 func readFromOrdersFile(folderPath string) (*schedOrders, error) {
+	//opens the json file and saves it to the variable jsonOrders
 	jsonOrders, err := os.Open(folderPath + fileSubPath)
 	if err != nil {
 		return nil, err
@@ -40,11 +41,13 @@ func readFromOrdersFile(folderPath string) (*schedOrders, error) {
 
 	var orderlist schedOrders
 
+	//If it was successfully opened, the content is read and put into the jsonContent variable
 	jsonContent, err := ioutil.ReadAll(jsonOrders)
 	if err != nil {
 		return nil, err
 	}
 
+	//If successfully read from the file, the content of the jsonContent variable is unmarshalled and put back into original form in the orderList
 	err = json.Unmarshal(jsonContent, &orderlist)
 	if err != nil {
 		return nil, err
@@ -52,6 +55,8 @@ func readFromOrdersFile(folderPath string) (*schedOrders, error) {
 	return &orderlist, nil
 }
 
+
+//Checks if the file of orders exists
 func fileExists(folderPath string) bool {
 	if _, err := os.Stat(folderPath + fileSubPath); err == nil {
 		return true
@@ -63,6 +68,8 @@ func fileExists(folderPath string) bool {
 	return false
 }
 
+
+//Deletes orders from the filepath
 func deleteOrdersFile(folderPath string) {
 	os.Remove(folderPath + "/orders.json")
 }

@@ -45,6 +45,7 @@ type Config struct {
 	WorkerLost         <-chan int
 }
 
+//Struct containing orders in the different directions
 type schedOrders struct {
 	OrdersUp   []*SchedulableOrder `json:"orders_up"`
 	OrdersDown []*SchedulableOrder `json:"orders_down"`
@@ -304,6 +305,7 @@ func handleElevHallBtnPressed(ctx context.Context, btn elevio.ButtonEvent, costM
 	}
 }
 
+//Sends the cost of specific orders for the elevators
 func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
 	//DeepCopy slices
 	msg := common.OrderCosts{
@@ -313,6 +315,8 @@ func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
 	}
 	c <- msg
 }
+
+//Selects an elevator based on which elevator is the cheapest for that specific order(direction and floor)
 func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Direction) int {
 	minCost := math.Inf(1)
 	worker := -1
@@ -335,6 +339,7 @@ func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Dire
 	return worker
 }
 
+//Finds the order with the highest priority
 func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *SchedulableOrder {
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
@@ -376,6 +381,7 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 	return currOrder
 }
 
+//Creates and order marked with assigned elevator and a timestamp
 func createOrder(floor int, dir common.Direction, assignee int) *SchedulableOrder {
 	return &SchedulableOrder{
 		Order: common.Order{
@@ -387,6 +393,7 @@ func createOrder(floor int, dir common.Direction, assignee int) *SchedulableOrde
 	}
 }
 
+//
 func handleNewOrder(orders *schedOrders, order SchedulableOrder) error {
 	switch order.Dir {
 	case common.UpDir:
@@ -407,6 +414,7 @@ func handleNewOrder(orders *schedOrders, order SchedulableOrder) error {
 	return nil
 }
 
+//Handles upcoming events once notice of an order being finished comes in
 func handleOrderCompleted(orders *schedOrders, order SchedulableOrder) {
 	switch order.Dir {
 	case common.UpDir:
@@ -421,6 +429,7 @@ func handleOrderCompleted(orders *schedOrders, order SchedulableOrder) {
 
 }
 
+//Adds an order to a slice of scheduled orders
 func tryAddOrderToSlice(slice []*SchedulableOrder, pos int, order SchedulableOrder) error {
 	if pos >= 0 && pos < len(slice) {
 		slice[pos] = &order
@@ -429,6 +438,7 @@ func tryAddOrderToSlice(slice []*SchedulableOrder, pos int, order SchedulableOrd
 	return errors.New("Invalid index")
 }
 
+//Removed orders from slice scheduled orders
 func tryRemoveOrderFromSlice(slice []*SchedulableOrder, pos int) error {
 	if pos >= 0 && pos < len(slice) {
 		slice[pos] = nil

@@ -89,6 +89,7 @@ func Run(ctx context.Context, config Config) {
 	}
 }
 
+//Adapts the incoming commands for the hardware
 func handleNewCommand(cmd Command) error {
 	switch cmd {
 	case CloseDoor:
@@ -107,6 +108,7 @@ func handleNewCommand(cmd Command) error {
 	return nil
 }
 
+//Handles change in light state(on/off)
 func handleNewLightState(light LightState) error {
 	switch light.Type {
 	case UpButtonLight:

@@ -166,6 +166,7 @@ func sendUntilDone(ctx context.Context, content atLeastOnceMsg, send chan<- atLe
 	defer timer.Stop()
 	//While not received all acks
 	done := false
+
 	for !done {
 		select {
 		case <-ctx.Done():
