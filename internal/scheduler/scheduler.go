@@ -29,7 +29,7 @@ type SchedulableOrder struct {
 type Config struct {
 	ElevatorID         int
 	NumFloors          int
-	FolderPath         string
+	FilePath           string
 	ElevButtonPressed  <-chan elevio.ButtonEvent
 	ElevCompletedOrder <-chan common.Order
 	ElevExecuteOrder   chan<- common.Order
@@ -111,8 +111,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 	go runSendLatestOrder(ctx, conf.ElevExecuteOrder, orderToElevator)
 
 	//Load orders if file exists
-	if fileExists(conf.FolderPath) {
-		fileOrders, err := readFromOrdersFile(conf.FolderPath)
+	if fileExists(conf.FilePath) {
+		fileOrders, err := readFromOrdersFile(conf.FilePath)
 		if err != nil {
 			log.Panicf("Error reading from file: %s\n", err)
 		}
@@ -131,7 +131,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		select {
 		case <-ctx.Done():
 			//Delete orders file on clean exit
-			deleteOrdersFile(conf.FolderPath)
+			deleteOrdersFile(conf.FilePath)
 			return
 		case <-skipSelect:
 			//Continue after select
@@ -193,7 +193,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		}
 
 		//Save orders to file
-		err := saveToOrdersFile(conf.FolderPath, &orders)
+		err := saveToOrdersFile(conf.FilePath, &orders)
 		if err != nil {
 			log.Panic(err)
 		}

@@ -7,33 +7,30 @@ import (
 	"os"
 )
 
-const fileSubPath string = "/orders.json"
-
 //turning an array of orders into json format before saving to a file. Saves to temporary file before
 //overwriting to make sure no data is lost if an error occurs.
-func saveToOrdersFile(folderPath string, currentOrders *schedOrders) error {
+func saveToOrdersFile(filePath string, currentOrders *schedOrders) error {
 	tofile, err := json.Marshal(currentOrders)
 	if err != nil {
 		return err
 	}
 	//Save to temporary file
-	err = ioutil.WriteFile(folderPath+fileSubPath+".tmp", tofile, 0644) //
+	err = ioutil.WriteFile(filePath+".tmp", tofile, 0644) //
 	if err != nil {
 		return err
 	}
 	//Rename file when write was successfull
-	err = os.Rename(folderPath+fileSubPath+".tmp", folderPath+fileSubPath)
+	err = os.Rename(filePath+".tmp", filePath)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-
 //Reads orders from a file and turn them back into an array of Order type from json format
-func readFromOrdersFile(folderPath string) (*schedOrders, error) {
+func readFromOrdersFile(filePath string) (*schedOrders, error) {
 	//opens the json file and saves it to the variable jsonOrders
-	jsonOrders, err := os.Open(folderPath + fileSubPath)
+	jsonOrders, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -55,10 +52,9 @@ func readFromOrdersFile(folderPath string) (*schedOrders, error) {
 	return &orderlist, nil
 }
 
-
 //Checks if the file of orders exists
-func fileExists(folderPath string) bool {
-	if _, err := os.Stat(folderPath + fileSubPath); err == nil {
+func fileExists(filePath string) bool {
+	if _, err := os.Stat(filePath); err == nil {
 		return true
 	} else if os.IsNotExist(err) {
 		return false
@@ -68,8 +64,7 @@ func fileExists(folderPath string) bool {
 	return false
 }
 
-
 //Deletes orders from the filepath
-func deleteOrdersFile(folderPath string) {
-	os.Remove(folderPath + "/orders.json")
+func deleteOrdersFile(filePath string) {
+	os.Remove(filePath)
 }

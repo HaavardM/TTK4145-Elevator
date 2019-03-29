@@ -123,7 +123,7 @@ func main() {
 		CostsSend:          costSend,
 		CostsRecv:          costRecv,
 		ElevExecuteOrder:   order,
-		FolderPath:         conf.FolderPath,
+		FilePath:           conf.FilePath,
 		WorkerLost:         workerLost,
 	}
 

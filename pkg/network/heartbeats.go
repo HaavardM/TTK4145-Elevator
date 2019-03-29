@@ -91,7 +91,6 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 			}
 		case <-heartbeatTicker.C:
 			sendHeartbeatChan <- cost
-			log.Println(cost)
 		}
 
 	}
