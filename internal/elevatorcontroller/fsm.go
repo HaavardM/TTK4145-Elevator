@@ -136,6 +136,8 @@ func (f *fsm) init(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.status.Floor = <-conf.ArrivedAtFloor
 	f.elevatorCommand <- elevatordriver.Stop
+	f.status.Dir = common.NoDir
+	f.statusSend <- f.status
 }
 
 //Handles incomming orders from the scheduler module

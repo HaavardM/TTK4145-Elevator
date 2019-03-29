@@ -46,6 +46,7 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 	cost := <-conf.CostIn
 
 	timeoutTimer := time.NewTicker(timeout)
+	heartbeatTicker := time.NewTicker(heartbInterval)
 
 	//Start atMostOnce service
 	go RunAtMostOnce(ctx, atMostOnceConfig)
@@ -56,13 +57,13 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 			return
 
 		case cost = <-conf.CostIn:
+			log.Printf("New local cost %v\n", cost)
 
 		case hbt := <-recvHeartbeatChan:
 			_, idfound := mapLastHeartbeat[hbt.ID]
 
 			//Send orders cost (includes id) to receiver
 			if !idfound || !reflect.DeepEqual(hbt, mapLastHeartbeat[hbt.ID].hbt) {
-				fmt.Printf("New cost %v\n", hbt)
 				conf.CostOut <- hbt
 			}
 			//Store timestamp
@@ -87,8 +88,9 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 					fmt.Printf("Disconnected node detected %d\n", id)
 				}
 			}
-		case <-time.After(heartbInterval):
+		case <-heartbeatTicker.C:
 			sendHeartbeatChan <- cost
+			log.Println(cost)
 		}
 
 	}

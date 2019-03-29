@@ -129,8 +129,6 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		skipSelect <- struct{}{}
 	}
 
-	go sendOrderCosts(conf.CostsSend, workers[conf.ElevatorID])
-
 	for {
 		//All blocking operations handled in select!
 		select {
