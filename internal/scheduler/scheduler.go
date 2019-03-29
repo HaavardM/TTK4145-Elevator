@@ -99,9 +99,6 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		},
 	}
 
-	//Stores last sent order to avoid sending duplicates
-	var lastOrder *SchedulableOrder
-
 	orderTimeout := time.NewTicker(20 * time.Second)
 
 	//Channel used to avoid select blocking when neccessary
@@ -170,7 +167,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 				} else {
 					log.Println("Unexpected order completed")
 				}
-			case common.UpDir, common.NoDir:
+			case common.UpDir:
 				schedOrder := orders.OrdersUp[order.Floor]
 				if schedOrder != nil {
 					//Send order completed event to network when available
@@ -178,6 +175,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 				} else {
 					log.Println("Unexpected order completed")
 				}
+			case common.NoDir:
+				//Already handled before switch
 			default:
 				log.Panicln("Unexpected direction")
 			}
@@ -223,8 +222,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 
 		//Find next order and send to elevatorcontroller
 		order := findHighestPriority(&orders, workers[conf.ElevatorID], conf.ElevatorID)
-		if order != nil && order != lastOrder {
-			lastOrder = order
+		if order != nil {
 			//Guranteed to not block by the receiver runSkipOldOrders
 			orderToElevator <- order.Order
 		}

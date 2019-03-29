@@ -118,9 +118,8 @@ func Run(ctx context.Context, conf Config) {
 
 	for {
 		select {
-		case order := <-conf.Order:
-			fsm.currentOrder = &order
-			fsm.handleNewOrders(conf)
+		case nextOrder := <-conf.Order:
+			fsm.handleNewOrders(conf, &nextOrder)
 		case fsm.status.Floor = <-conf.ArrivedAtFloor:
 			fsm.handleAtFloor(conf)
 		case <-fsm.timer.C:
@@ -141,15 +140,15 @@ func (f *fsm) init(conf Config) {
 }
 
 //Handles incomming orders from the scheduler module
-func (f *fsm) handleNewOrders(conf Config) {
+func (f *fsm) handleNewOrders(conf Config, order *common.Order) {
 
-	if f.currentOrder == nil {
+	if order == nil {
 		return
 	}
 	//Initializes variables for the statemachine
-	targetFloor := f.currentOrder.Floor
+	targetFloor := order.Floor
 	currentFloor := f.status.Floor
-	targetDir := f.currentOrder.Dir
+	targetDir := order.Dir
 
 	//Elevator out of range
 	if (targetDir == common.UpDir && targetFloor >= conf.NumberOfFloors) || (targetDir == common.DownDir && targetFloor <= 0) {
@@ -158,19 +157,18 @@ func (f *fsm) handleNewOrders(conf Config) {
 
 	switch f.state {
 	case stateMovingDown:
-		if currentFloor == targetFloor {
-			f.transitionToDoorOpen()
-		} else if f.orderAbove(currentFloor) {
+		f.currentOrder = order
+		if f.orderAbove(currentFloor) || currentFloor == targetFloor {
 			f.transitionToMovingUp(conf)
 		}
 	case stateMovingUp:
-		if currentFloor == targetFloor {
-			f.transitionToDoorOpen()
-		} else if !f.orderAbove(currentFloor) {
+		f.currentOrder = order
+		if !f.orderAbove(currentFloor) || currentFloor == targetFloor {
 			f.transitionToMovingDown(conf)
 		}
 
-	case stateDoorOpen, stateDoorClosed:
+	case stateDoorClosed:
+		f.currentOrder = order
 		if currentFloor == targetFloor {
 			f.transitionToDoorOpen()
 		} else if f.orderAbove(currentFloor) {
