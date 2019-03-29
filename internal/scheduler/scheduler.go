@@ -23,6 +23,7 @@ type SchedulableOrder struct {
 	common.Order `json:"order"`
 	Worker       int       `json:"assignee"`
 	Timestamp    time.Time `json:"timestamp"`
+	completed    *time.Time
 }
 
 //Config contains scheduler configuration variables
@@ -100,8 +101,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		},
 	}
 
-	orderTimeout := time.NewTicker(20 * time.Second)
-
+	orderTimeout := 20 * time.Second
+	orderTimeoutTicker := time.NewTicker(orderTimeout)
 	//Channel used to avoid select blocking when neccessary
 	skipSelect := make(chan struct{}, 1)
 
@@ -138,9 +139,9 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			//Continue after select
 		case id := <-conf.WorkerLost:
 			delete(workers, id)
-			reassignInvalidOrders(ctx, &orders, time.Minute, workers, conf.NewOrderSend)
-		case <-orderTimeout.C:
-			reassignInvalidOrders(ctx, &orders, time.Minute, workers, conf.NewOrderSend)
+			reassignInvalidOrders(ctx, &orders, orderTimeout, workers, conf.NewOrderSend)
+		case <-orderTimeoutTicker.C:
+			reassignInvalidOrders(ctx, &orders, orderTimeout, workers, conf.NewOrderSend)
 		case elevatorStatus := <-conf.ElevStatus:
 			if cost, ok := workers[conf.ElevatorID]; ok {
 				updateElevatorCost(conf, cost, elevatorStatus, &orders, conf.ElevatorID)
@@ -151,6 +152,10 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 				log.Panicf("Missing elevator cost in costmap")
 			}
 		case costs := <-conf.CostsRecv:
+			//If a new elevator connects - share all orders
+			if _, ok := workers[costs.ID]; !ok {
+				publishAllHallOrders(ctx, &orders, conf.NewOrderSend)
+			}
 			workers[costs.ID] = &costs
 		case order := <-conf.NewOrderRecv:
 			handleNewOrder(&orders, order)
@@ -160,12 +165,15 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			log.Printf("Elev completed order %v\n", order)
 
 			orders.OrdersCab[order.Floor] = nil
+			completedTime := time.Now()
 			switch order.Dir {
 			case common.DownDir:
 				schedOrder := orders.OrdersDown[order.Floor]
 				if schedOrder != nil {
 					//Send order completed event to network when available
 					go utilities.SendMessage(ctx, conf.OrderCompletedSend, *schedOrder)
+					//Completed but not (yet) acked by network. Do not send it to the elevator again
+					schedOrder.completed = &completedTime
 				} else {
 					log.Println("Unexpected order completed")
 				}
@@ -174,6 +182,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 				if schedOrder != nil {
 					//Send order completed event to network when available
 					go utilities.SendMessage(ctx, conf.OrderCompletedSend, *schedOrder)
+					//Completed but not (yet) acked by network. Do not send it to the elevator again
+					schedOrder.completed = &completedTime
 				} else {
 					log.Println("Unexpected order completed")
 				}
@@ -244,6 +254,11 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 
 		//Check if timeout have passed
 		if time.Now().Sub(order.Timestamp) > timeout {
+			renewOrder = true
+		}
+
+		//If order is completed and has been for some time
+		if order.completed != nil && time.Now().Sub(*order.completed) > timeout {
 			renewOrder = true
 		}
 
@@ -333,7 +348,7 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 	var currOrder *SchedulableOrder
 	//Check cab calls
 	for _, order := range orders.OrdersCab {
-		if order == nil || order.Worker != id {
+		if order == nil || order.Worker != id || order.completed != nil {
 			continue
 		}
 		orderCost := cost.CostsCab[order.Floor]
@@ -345,7 +360,7 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 
 	//Check down hall orders
 	for _, order := range orders.OrdersDown {
-		if order == nil || order.Worker != id {
+		if order == nil || order.Worker != id || order.completed != nil {
 			continue
 		}
 		orderCost := cost.CostsDown[order.Floor]
@@ -357,7 +372,7 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 
 	//Check up hall orders
 	for _, order := range orders.OrdersUp {
-		if order == nil || order.Worker != id {
+		if order == nil || order.Worker != id || order.completed != nil {
 			continue
 		}
 		orderCost := cost.CostsUp[order.Floor]
