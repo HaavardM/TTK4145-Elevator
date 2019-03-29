@@ -17,5 +17,8 @@ git:
 
 commit: git push_docker
 
+build:
+	go build -o main main.go
+
 
 .PHONY: commit
