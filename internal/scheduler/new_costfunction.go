@@ -82,5 +82,24 @@ func updateElevatorCost(conf Config, costs *common.OrderCosts, status common.Ele
 			}
 		}
 		costs.OrderCount = orderCount
+		costs.CostsUp[i] += orderCount
+		costs.CostsDown[i] += orderCount
+		costs.CostsCab[i] += orderCount
+
+		if !status.Moving && conf.PrevOrderDir == common.UpDir {
+			for j := 0; j < status.Floor; j++ {
+				costs.CostsUp[j] += 1.0
+				costs.CostsDown[j] += 1.0
+				costs.CostsCab[j] += 1.0
+			}
+		}
+
+		if !status.Moving && conf.PrevOrderDir == common.DownDir {
+			for j := 0; status.Floor < conf.NumFloors; j++ {
+				costs.CostsUp[j] += 1.0
+				costs.CostsDown[j] += 1.0
+				costs.CostsCab[j] += 1.0
+			}
+		}
 	}
 }

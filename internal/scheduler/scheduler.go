@@ -30,6 +30,7 @@ type Config struct {
 	ElevatorID         int
 	NumFloors          int
 	FilePath           string
+	PrevOrderDir       common.Direction //needs configuration?
 	ElevButtonPressed  <-chan elevio.ButtonEvent
 	ElevCompletedOrder <-chan common.Order
 	ElevExecuteOrder   chan<- common.Order
@@ -154,7 +155,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		case order := <-conf.NewOrderRecv:
 			handleNewOrder(&orders, order)
 		case order := <-conf.OrderCompletedRecv:
-			handleOrderCompleted(&orders, order)
+			handleOrderCompleted(&orders, order, conf)
 		case order := <-conf.ElevCompletedOrder:
 			log.Printf("Elev completed order %v\n", order)
 
@@ -402,16 +403,19 @@ func handleNewOrder(orders *schedOrders, order SchedulableOrder) error {
 }
 
 //Handles upcoming events once notice of an order being finished comes in
-func handleOrderCompleted(orders *schedOrders, order SchedulableOrder) {
+func handleOrderCompleted(orders *schedOrders, order SchedulableOrder, conf Config) {
 	switch order.Dir {
 	case common.UpDir:
 		if err := tryRemoveOrderFromSlice(orders.OrdersUp, order.Floor); err != nil {
 			log.Println("Error removing order: ", err)
 		}
+		conf.PrevOrderDir = common.UpDir
 	case common.DownDir:
 		if err := tryRemoveOrderFromSlice(orders.OrdersDown, order.Floor); err != nil {
 			log.Println("Error removing order: ", err)
 		}
+		conf.PrevOrderDir = common.DownDir
+
 	}
 
 }
