@@ -142,7 +142,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			reassignInvalidOrders(ctx, &orders, time.Minute, workers, conf.NewOrderSend)
 		case elevatorStatus := <-conf.ElevStatus:
 			if cost, ok := workers[conf.ElevatorID]; ok {
-				updateElevatorCost(conf, cost, elevatorStatus)
+				updateElevatorCost(conf, cost, elevatorStatus, &orders, conf.ElevatorID)
 				//Send cost using deep copy
 				//Not critical if multiple of these are sent in wrong order
 				go sendOrderCosts(conf.CostsSend, cost)
@@ -157,6 +157,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			handleOrderCompleted(&orders, order)
 		case order := <-conf.ElevCompletedOrder:
 			log.Printf("Elev completed order %v\n", order)
+
 			orders.OrdersCab[order.Floor] = nil
 			switch order.Dir {
 			case common.DownDir:
@@ -314,22 +315,12 @@ func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
 
 //Selects an elevator based on which elevator is the cheapest for that specific order(direction and floor)
 func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Direction) int {
-	minCost := math.Inf(1)
+	minCost := 1000000
 	worker := -1
-	for k, v := range workers {
-		switch dir {
-		case common.UpDir:
-			if cost := v.CostsUp[floor]; cost < minCost {
-				minCost = cost
-				worker = k
-			}
-		case common.DownDir:
-			if cost := v.CostsDown[floor]; cost < minCost {
-				minCost = cost
-				worker = k
-			}
-		default:
-			log.Panicf("Invalid direction %s\n", dir)
+	for _, v := range workers {
+		if v.OrderCount < minCost {
+			minCost = v.OrderCount
+			worker = v.ID
 		}
 	}
 	return worker

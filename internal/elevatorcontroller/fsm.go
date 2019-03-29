@@ -136,6 +136,7 @@ func (f *fsm) init(conf Config) {
 	f.status.Floor = <-conf.ArrivedAtFloor
 	f.elevatorCommand <- elevatordriver.Stop
 	f.status.Dir = common.NoDir
+	f.status.Dir = common.NoDir
 	f.statusSend <- f.status
 }
 
@@ -199,6 +200,7 @@ func (f *fsm) transitionToDoorOpen() {
 	f.elevatorCommand <- elevatordriver.OpenDoor
 	f.timer.Reset(doorOpenDuration)
 	f.state = stateDoorOpen
+	f.status.Moving = false
 
 }
 
@@ -206,7 +208,7 @@ func (f *fsm) transitionToDoorOpen() {
 func (f *fsm) transitionToDoorClosed() {
 	log.Println("Transition to door closed")
 	f.elevatorCommand <- elevatordriver.CloseDoor
-	f.status.Dir = common.NoDir
+	f.status.Moving = false
 	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
 		log.Println(err)
 	}
@@ -223,6 +225,7 @@ func (f *fsm) transitionToMovingDown(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.DownDir
+	f.status.Moving = true
 	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
 		log.Println(err)
 	}
@@ -236,6 +239,7 @@ func (f *fsm) transitionToMovingUp(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Dir = common.UpDir
+	f.status.Moving = true
 	log.Println("Start")
 	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
 		log.Println(err)

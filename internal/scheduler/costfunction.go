@@ -1,11 +1,12 @@
 package scheduler
 
+/*
 import (
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 )
 
 
-//Updates the cost of an elevator when the status of the elevator changes. 
+//Updates the cost of an elevator when the status of the elevator changes.
 //Assigning an elevator to an order is based on the cost of the elevator to perform the specific order.
 func updateElevatorCost(conf Config, costs *common.OrderCosts, status common.ElevatorStatus) {
 	//Penalty if the elevator has to change direction to get to the floor of the order
@@ -66,3 +67,5 @@ func updateElevatorCost(conf Config, costs *common.OrderCosts, status common.Ele
 		}
 	}
 }
+
+*/
