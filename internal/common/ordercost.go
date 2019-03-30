@@ -4,7 +4,7 @@ package common
 type OrderCosts struct {
 	ID         int       `json:"id"`
 	OrderCount int       `json:"order_count"`
-	CostsUp    []float64 `json:"cost_up"`
-	CostsDown  []float64 `json:"cost_down"`
-	CostsCab   []float64 `json:"cost_cab"`
+	HallUp     []float64 `json:"cost_up"`
+	HallDown   []float64 `json:"cost_down"`
+	Cab        []float64 `json:"cost_cab"`
 }

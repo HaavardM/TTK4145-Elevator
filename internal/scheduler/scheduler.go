@@ -52,9 +52,9 @@ type Config struct {
 
 //Struct containing orders in the different directions
 type schedOrders struct {
-	OrdersUp   []*SchedulableOrder `json:"orders_up"`
-	OrdersDown []*SchedulableOrder `json:"orders_down"`
-	OrdersCab  []*SchedulableOrder `json:"orders_cab"`
+	HallUp   []*SchedulableOrder `json:"orders_up"`
+	HallDown []*SchedulableOrder `json:"orders_down"`
+	Cab      []*SchedulableOrder `json:"orders_cab"`
 }
 
 //If for some reason the scheduler generates orders faster than the elevatorcontroller
@@ -90,17 +90,17 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 
 	//Contains orders for all floors and directions
 	orders := schedOrders{
-		OrdersUp:   make([]*SchedulableOrder, conf.NumFloors),
-		OrdersDown: make([]*SchedulableOrder, conf.NumFloors),
-		OrdersCab:  make([]*SchedulableOrder, conf.NumFloors),
+		HallUp:   make([]*SchedulableOrder, conf.NumFloors),
+		HallDown: make([]*SchedulableOrder, conf.NumFloors),
+		Cab:      make([]*SchedulableOrder, conf.NumFloors),
 	}
 	//Contains the cost for orders to all floor by all elevators
 	workers := map[int]*common.OrderCosts{
 		conf.ElevatorID: &common.OrderCosts{
-			ID:        conf.ElevatorID,
-			CostsUp:   make([]float64, conf.NumFloors),
-			CostsDown: make([]float64, conf.NumFloors),
-			CostsCab:  make([]float64, conf.NumFloors),
+			ID:       conf.ElevatorID,
+			HallUp:   make([]float64, len(orders.HallUp)),
+			HallDown: make([]float64, len(orders.HallDown)),
+			Cab:      make([]float64, len(orders.Cab)),
 		},
 	}
 
@@ -163,11 +163,11 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		case order := <-conf.ElevCompletedOrder:
 			log.Printf("Elev completed order %v\n", order)
 			//Save previous order
-			orders.OrdersCab[order.Floor] = nil
+			orders.Cab[order.Floor] = nil
 			completedTime := time.Now()
 			switch order.Dir {
 			case common.DownDir:
-				schedOrder := orders.OrdersDown[order.Floor]
+				schedOrder := orders.HallDown[order.Floor]
 				if schedOrder != nil {
 					//Send order completed event to network when available
 					go utilities.SendMessage(ctx, conf.OrderCompletedSend, *schedOrder)
@@ -177,7 +177,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 					log.Println("Unexpected order completed")
 				}
 			case common.UpDir:
-				schedOrder := orders.OrdersUp[order.Floor]
+				schedOrder := orders.HallUp[order.Floor]
 				if schedOrder != nil {
 					//Send order completed event to network when available
 					go utilities.SendMessage(ctx, conf.OrderCompletedSend, *schedOrder)
@@ -195,30 +195,35 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		case btn := <-conf.ElevButtonPressed:
 			log.Printf("Button pressed %v\n", btn)
 			if btn.Button == elevio.BT_Cab {
-				if orders.OrdersCab[btn.Floor] == nil {
-					orders.OrdersCab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
+				if orders.Cab[btn.Floor] == nil {
+					orders.Cab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
 				}
 			} else {
 				handleElevHallBtnPressed(ctx, btn, workers, conf.NewOrderSend)
 			}
 		}
 
+		//Update elevators cost
 		if cost, ok := workers[conf.ElevatorID]; ok {
-			updateElevatorCost(cost, elevatorStatus, &orders, conf.ElevatorID)
+			newCost := createElevatorCost(elevatorStatus, &orders, conf.ElevatorID)
+			*cost = newCost
 			//Send cost using deep copy
 			//Not critical if multiple of these are sent in wrong order
 			go sendOrderCosts(conf.CostsSend, cost)
 		} else {
 			log.Panicf("Missing elevator cost in costmap")
 		}
+
 		//Save orders to file
 		err := saveToOrdersFile(conf.FilePath, &orders)
 		if err != nil {
 			log.Panic(err)
-		}
+		} else {
+			//Lights is only set if the order is saved to file without issues.
+			//Update status lights based on updated orders
+			setLightsFromOrders(orders, conf.Lights, conf.NumFloors)
 
-		//Update status lights based on updated orders
-		setLightsFromOrders(orders, conf.Lights, conf.NumFloors)
+		}
 
 		//Find next order and send to elevatorcontroller
 		order := findHighestPriority(&orders, workers[conf.ElevatorID], conf.ElevatorID)
@@ -233,7 +238,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 
 func setLightsFromOrders(orders schedOrders, lights chan<- elevatordriver.LightState, numFloors int) {
 	//Set order lights
-	for floor, order := range orders.OrdersUp {
+	for floor, order := range orders.HallUp {
 		//No up light in top floor
 		if floor >= numFloors {
 			continue
@@ -241,7 +246,7 @@ func setLightsFromOrders(orders schedOrders, lights chan<- elevatordriver.LightS
 		//Receiver never blocks
 		lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.UpButtonLight, State: (order != nil)}
 	}
-	for floor, order := range orders.OrdersDown {
+	for floor, order := range orders.HallDown {
 		//No down light in base floor
 		if floor <= 0 {
 			continue
@@ -249,7 +254,7 @@ func setLightsFromOrders(orders schedOrders, lights chan<- elevatordriver.LightS
 		//Receiver never blocks
 		lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.DownButtonLight, State: (order != nil)}
 	}
-	for floor, order := range orders.OrdersCab {
+	for floor, order := range orders.Cab {
 		//Receiver never blocks
 		lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.InternalButtonLight, State: (order != nil)}
 	}
@@ -257,9 +262,9 @@ func setLightsFromOrders(orders schedOrders, lights chan<- elevatordriver.LightS
 }
 
 func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout time.Duration, workers map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
-	hallOrders := make([]*SchedulableOrder, 0, len(orders.OrdersDown)+len(orders.OrdersUp))
-	hallOrders = append(hallOrders, orders.OrdersDown...)
-	hallOrders = append(hallOrders, orders.OrdersUp...)
+	hallOrders := make([]*SchedulableOrder, 0, len(orders.HallDown)+len(orders.HallUp))
+	hallOrders = append(hallOrders, orders.HallDown...)
+	hallOrders = append(hallOrders, orders.HallUp...)
 	//Check for timeout or invalid assignee
 	for _, order := range hallOrders {
 		renewOrder := false
@@ -290,7 +295,7 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 		}
 	}
 
-	for _, order := range orders.OrdersCab {
+	for _, order := range orders.Cab {
 		if order == nil {
 			continue
 		}
@@ -304,9 +309,9 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 
 func publishAllHallOrders(ctx context.Context, orders *schedOrders, send chan<- SchedulableOrder) {
 	//Get hall orders
-	hallOrders := make([]*SchedulableOrder, 0, len(orders.OrdersDown)+len(orders.OrdersUp))
-	hallOrders = append(hallOrders, orders.OrdersDown...)
-	hallOrders = append(hallOrders, orders.OrdersUp...)
+	hallOrders := make([]*SchedulableOrder, 0, len(orders.HallDown)+len(orders.HallUp))
+	hallOrders = append(hallOrders, orders.HallDown...)
+	hallOrders = append(hallOrders, orders.HallUp...)
 
 	for _, order := range hallOrders {
 		if order != nil {
@@ -339,9 +344,9 @@ func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
 	msg := common.OrderCosts{
 		ID:         costs.ID,
 		OrderCount: costs.OrderCount,
-		CostsDown:  append(make([]float64, 0, len(costs.CostsDown)), costs.CostsDown...),
-		CostsUp:    append(make([]float64, 0, len(costs.CostsUp)), costs.CostsUp...),
-		CostsCab:   append(make([]float64, 0, len(costs.CostsCab)), costs.CostsCab...),
+		HallDown:   append(make([]float64, 0, len(costs.HallDown)), costs.HallDown...),
+		HallUp:     append(make([]float64, 0, len(costs.HallUp)), costs.HallUp...),
+		Cab:        append(make([]float64, 0, len(costs.Cab)), costs.Cab...),
 	}
 	c <- msg
 }
@@ -353,17 +358,17 @@ func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Dire
 	for _, v := range workers {
 		switch dir {
 		case common.NoDir:
-			if cost := v.CostsCab[floor]; cost < minCost {
+			if cost := v.Cab[floor]; cost < minCost {
 				worker = v.ID
 				minCost = cost
 			}
 		case common.UpDir:
-			if cost := v.CostsUp[floor]; cost < minCost {
+			if cost := v.HallUp[floor]; cost < minCost {
 				worker = v.ID
 				minCost = cost
 			}
 		case common.DownDir:
-			if cost := v.CostsDown[floor]; cost < minCost {
+			if cost := v.HallDown[floor]; cost < minCost {
 				worker = v.ID
 				minCost = cost
 			}
@@ -379,11 +384,11 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
 	//Check cab calls
-	for _, order := range orders.OrdersCab {
+	for _, order := range orders.Cab {
 		if order == nil || order.Worker != id || order.completed != nil {
 			continue
 		}
-		orderCost := cost.CostsCab[order.Floor]
+		orderCost := cost.Cab[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
 			currOrder = order
@@ -392,11 +397,11 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 	}
 
 	//Check down hall orders
-	for _, order := range orders.OrdersDown {
+	for _, order := range orders.HallDown {
 		if order == nil || order.Worker != id || order.completed != nil {
 			continue
 		}
-		orderCost := cost.CostsDown[order.Floor]
+		orderCost := cost.HallDown[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
 			currOrder = order
@@ -404,11 +409,11 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 	}
 
 	//Check up hall orders
-	for _, order := range orders.OrdersUp {
+	for _, order := range orders.HallUp {
 		if order == nil || order.Worker != id || order.completed != nil {
 			continue
 		}
-		orderCost := cost.CostsUp[order.Floor]
+		orderCost := cost.HallUp[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
 			currOrder = order
@@ -434,15 +439,15 @@ func createOrder(floor int, dir common.Direction, assignee int) *SchedulableOrde
 func handleNewOrder(orders *schedOrders, order SchedulableOrder) error {
 	switch order.Dir {
 	case common.UpDir:
-		if err := tryAddOrderToSlice(orders.OrdersUp, order.Floor, order); err != nil {
+		if err := tryAddOrderToSlice(orders.HallUp, order.Floor, order); err != nil {
 			return err
 		}
 	case common.DownDir:
-		if err := tryAddOrderToSlice(orders.OrdersDown, order.Floor, order); err != nil {
+		if err := tryAddOrderToSlice(orders.HallDown, order.Floor, order); err != nil {
 			return err
 		}
 	case common.NoDir:
-		if err := tryAddOrderToSlice(orders.OrdersCab, order.Floor, order); err != nil {
+		if err := tryAddOrderToSlice(orders.Cab, order.Floor, order); err != nil {
 			return err
 		}
 	default:
@@ -455,11 +460,11 @@ func handleNewOrder(orders *schedOrders, order SchedulableOrder) error {
 func handleOrderCompleted(orders *schedOrders, order SchedulableOrder, conf Config) {
 	switch order.Dir {
 	case common.UpDir:
-		if err := tryRemoveOrderFromSlice(orders.OrdersUp, order.Floor); err != nil {
+		if err := tryRemoveOrderFromSlice(orders.HallUp, order.Floor); err != nil {
 			log.Println("Error removing order: ", err)
 		}
 	case common.DownDir:
-		if err := tryRemoveOrderFromSlice(orders.OrdersDown, order.Floor); err != nil {
+		if err := tryRemoveOrderFromSlice(orders.HallDown, order.Floor); err != nil {
 			log.Println("Error removing order: ", err)
 		}
 

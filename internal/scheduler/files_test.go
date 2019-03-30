@@ -11,7 +11,7 @@ const FilePath string = "/home/haavard"
 
 func TestSaveRead(t *testing.T) {
 	orders := schedOrders{
-		OrdersCab: []*SchedulableOrder{
+		Cab: []*SchedulableOrder{
 			&SchedulableOrder{
 				Order: common.Order{
 					Floor: 0,
@@ -22,7 +22,7 @@ func TestSaveRead(t *testing.T) {
 			nil,
 			nil,
 		},
-		OrdersUp: []*SchedulableOrder{
+		HallUp: []*SchedulableOrder{
 			nil,
 			&SchedulableOrder{
 				Order: common.Order{
@@ -32,7 +32,7 @@ func TestSaveRead(t *testing.T) {
 			},
 			nil,
 		},
-		OrdersDown: []*SchedulableOrder{
+		HallDown: []*SchedulableOrder{
 			&SchedulableOrder{
 				Order: common.Order{
 					Floor: 1,
