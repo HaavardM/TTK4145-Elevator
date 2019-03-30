@@ -124,5 +124,5 @@ func countOrdersWithID(orders *schedOrders, id int) int {
 			orderCount++
 		}
 	}
-	return id
+	return orderCount
 }

@@ -110,14 +110,11 @@ func Run(ctx context.Context, conf Config) {
 	for {
 		select {
 		case nextOrder := <-conf.Order:
-			log.Println("New order")
 			fsm.handleNewOrders(conf, nextOrder)
 		case fsm.status.Floor = <-conf.ArrivedAtFloor:
 			fsm.handleAtFloor(conf)
-			log.Println("New floor")
 		case <-fsm.timer.C:
 			fsm.handleTimerElapsed(conf)
-			log.Println("New timer")
 		case <-ctx.Done():
 			break
 		}

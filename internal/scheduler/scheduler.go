@@ -197,6 +197,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			if btn.Button == elevio.BT_Cab {
 				if orders.Cab[btn.Floor] == nil {
 					orders.Cab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
+					log.Println("Local cabcall added with floor: ", btn.Floor)
 				}
 			} else {
 				handleElevHallBtnPressed(ctx, btn, workers, conf.NewOrderSend)
@@ -330,11 +331,13 @@ func handleElevHallBtnPressed(ctx context.Context, btn elevio.ButtonEvent, costM
 		order := createOrder(btn.Floor, common.DownDir, worker)
 		//Send new order to network when available
 		go utilities.SendMessage(ctx, sendOrder, *order)
+		log.Println("New HallDown order assigned to ", worker)
 	case elevio.BT_HallUp:
 		worker := selectWorker(costMap, btn.Floor, common.UpDir)
 		order := createOrder(btn.Floor, common.UpDir, worker)
 		//Send new order to network when available
 		go utilities.SendMessage(ctx, sendOrder, *order)
+		log.Println("New HallUp order assigned to ", worker)
 	default:
 		log.Panic("Invalid button type")
 	}
