@@ -4,102 +4,87 @@ import (
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 )
 
-func updateElevatorCost(conf Config, costs *common.OrderCosts, status common.ElevatorStatus, orders *schedOrders, id int) {
-	dirPenalty := 3.0
-	cabPenalty := 0.5
+func updateElevatorCost(costs *common.OrderCosts, status common.ElevatorStatus, orders *schedOrders, id int) {
+	//Count orders
+	orderCount := 0
 
-	for i := 0; i < conf.NumFloors; i++ {
-		posCost := false
-		negCost := false
-		cost := float64(i - status.Floor)
-
-		//hvis på vei i feil retning(vekk fra ordre)
-		if (cost < 0 && status.Dir == common.UpDir) || (cost > 0 && status.Dir == common.DownDir) || cost == 0 && status.Moving {
-			if cost < 0 {
-				cost = -cost
-			}
-			if status.Dir == common.UpDir {
-				//må først opp og så ned igjen
-				//status.floor null-indeks
-				cost += float64(conf.NumFloors-(status.Floor+1)) * 2
-			} else if status.Dir == common.DownDir {
-				//først ned og så opp
-				cost += float64(status.Floor * 2)
-			}
-			//straffe ekstra for å være feil
-		}
-
-		if cost < 0 {
-			negCost = true
-			cost = -cost
-		} else if cost > 0 {
-			posCost = true
-		}
-
-		costs.CostsUp[i] = cost
-		costs.CostsDown[i] = cost
-		costs.CostsCab[i] = cabPenalty + cost
-
-		//straffe ekstra i motsatt retning. Skal ikke strffe at vi vil opp i 1. da det er eneste alternative retning
-		if status.Dir == common.DownDir && i != 0 {
-			costs.CostsUp[i] = cost + dirPenalty
-		}
-
-		//skal ikke straffe at vi ned i 4. da det er eneste alternative retning
-		if status.Dir == common.UpDir && i < conf.NumFloors {
-			costs.CostsDown[i] = cost + dirPenalty
-		}
-
-		//NoDir på heis, vil straffe ordre over heis som vil ned igjen, med unntak av 4.etasje
-		if !status.Moving && posCost && i < conf.NumFloors {
-			costs.CostsDown[i] = cost + dirPenalty
-		}
-
-		//NoDir på heis, vil straffe ordre under som vil opp igjen, med unntak av 1. etasje
-		if !status.Moving && negCost && i > 0 {
-			costs.CostsUp[i] = cost + dirPenalty
-		}
-
-		orderCount := 0
-		//Check down hall orders
-		for _, order := range orders.OrdersDown {
-			if order != nil && order.Worker == id {
-				orderCount++
-			}
-		}
-
-		//Check up hall orders
-		for _, order := range orders.OrdersUp {
-			if order != nil && order.Worker == id {
-				orderCount++
-			}
-		}
-
-		//Check cab call orders
-		for _, order := range orders.OrdersCab {
-			if order != nil && order.Worker == id {
-				orderCount++
-			}
-		}
-		costs.OrderCount = orderCount
-		costs.CostsUp[i] += orderCount
-		costs.CostsDown[i] += orderCount
-		costs.CostsCab[i] += orderCount
-
-		if !status.Moving && conf.PrevOrderDir == common.UpDir {
-			for j := 0; j < status.Floor; j++ {
-				costs.CostsUp[j] += 1.0
-				costs.CostsDown[j] += 1.0
-				costs.CostsCab[j] += 1.0
-			}
-		}
-
-		if !status.Moving && conf.PrevOrderDir == common.DownDir {
-			for j := 0; status.Floor < conf.NumFloors; j++ {
-				costs.CostsUp[j] += 1.0
-				costs.CostsDown[j] += 1.0
-				costs.CostsCab[j] += 1.0
-			}
+	allOrders := make([]*SchedulableOrder, 0, len(orders.OrdersCab)+len(orders.OrdersDown)+len(orders.OrdersUp))
+	allOrders = append(allOrders, orders.OrdersCab...)
+	allOrders = append(allOrders, orders.OrdersDown...)
+	allOrders = append(allOrders, orders.OrdersUp...)
+	//Count valid, existing orders for this elevator
+	for _, order := range allOrders {
+		if order != nil && order.Worker == id {
+			orderCount++
 		}
 	}
+	newCost := common.OrderCosts{
+		ID:         id,
+		OrderCount: orderCount,
+		CostsCab:   make([]float64, len(costs.CostsCab)),
+		CostsUp:    make([]float64, len(costs.CostsUp)),
+		CostsDown:  make([]float64, len(costs.CostsDown)),
+	}
+	costCount := 0
+	var searchDir int
+	var currentQueue []*SchedulableOrder
+	var currCost []float64
+	startFloor := status.Floor
+
+	if status.Dir == common.UpDir {
+		searchDir = 1
+		currentQueue = orders.OrdersUp
+		currCost = newCost.CostsUp
+	} else {
+		searchDir = -1
+		currentQueue = orders.OrdersDown
+		currCost = newCost.CostsDown
+	}
+	if status.Moving {
+		startFloor += searchDir
+	}
+	currFloor := startFloor
+
+	for ; currFloor < len(currentQueue) && currFloor >= 0; currFloor += searchDir {
+		orderCost := float64(costCount + orderCount)
+		currCost[currFloor] = orderCost
+		newCost.CostsCab[currFloor] = orderCost + 0.5
+		costCount++
+	}
+
+	if searchDir > 0 {
+		currentQueue = orders.OrdersDown
+		currCost = newCost.CostsDown
+	} else {
+		currentQueue = orders.OrdersUp
+		currCost = newCost.CostsUp
+	}
+	//Switch direction
+	searchDir *= -1
+	//Search opposite direction
+	for currFloor += searchDir; currFloor < len(currentQueue) && currFloor >= 0; currFloor += searchDir {
+		orderCost := float64(costCount + orderCount)
+		currCost[currFloor] = orderCost
+		if newCost.CostsCab[currFloor] <= 0.25 {
+			newCost.CostsCab[currFloor] = orderCost + 0.5
+		}
+		costCount++
+	}
+
+	if searchDir > 0 {
+		currentQueue = orders.OrdersDown
+		currCost = newCost.CostsDown
+	} else {
+		currentQueue = orders.OrdersUp
+		currCost = newCost.CostsUp
+	}
+	//Switch direction
+	searchDir *= -1
+	//Search opposite direction
+	for currFloor += searchDir; currFloor != startFloor; currFloor += searchDir {
+		orderCost := float64(costCount + orderCount)
+		currCost[currFloor] = orderCost
+		costCount++
+	}
+	*costs = newCost
 }

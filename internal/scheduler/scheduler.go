@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"reflect"
 	"sync"
 	"time"
+
+	"github.com/rs/xid"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 
@@ -23,6 +26,7 @@ type SchedulableOrder struct {
 	common.Order `json:"order"`
 	Worker       int       `json:"assignee"`
 	Timestamp    time.Time `json:"timestamp"`
+	OrderID      string    `json:"order_id"`
 	completed    *time.Time
 }
 
@@ -31,7 +35,6 @@ type Config struct {
 	ElevatorID         int
 	NumFloors          int
 	FilePath           string
-	PrevOrderDir       common.Direction //needs configuration?
 	ElevButtonPressed  <-chan elevio.ButtonEvent
 	ElevCompletedOrder <-chan common.Order
 	ElevExecuteOrder   chan<- common.Order
@@ -128,6 +131,9 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		skipSelect <- struct{}{}
 	}
 
+	var prevOrder SchedulableOrder
+	var elevatorStatus common.ElevatorStatus
+
 	for {
 		//All blocking operations handled in select!
 		select {
@@ -142,15 +148,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			reassignInvalidOrders(ctx, &orders, orderTimeout, workers, conf.NewOrderSend)
 		case <-orderTimeoutTicker.C:
 			reassignInvalidOrders(ctx, &orders, orderTimeout, workers, conf.NewOrderSend)
-		case elevatorStatus := <-conf.ElevStatus:
-			if cost, ok := workers[conf.ElevatorID]; ok {
-				updateElevatorCost(conf, cost, elevatorStatus, &orders, conf.ElevatorID)
-				//Send cost using deep copy
-				//Not critical if multiple of these are sent in wrong order
-				go sendOrderCosts(conf.CostsSend, cost)
-			} else {
-				log.Panicf("Missing elevator cost in costmap")
-			}
+		case elevatorStatus = <-conf.ElevStatus:
+			//Updates elevator stauts
 		case costs := <-conf.CostsRecv:
 			//If a new elevator connects - share all orders
 			if _, ok := workers[costs.ID]; !ok {
@@ -163,7 +162,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			handleOrderCompleted(&orders, order, conf)
 		case order := <-conf.ElevCompletedOrder:
 			log.Printf("Elev completed order %v\n", order)
-
+			//Save previous order
 			orders.OrdersCab[order.Floor] = nil
 			completedTime := time.Now()
 			switch order.Dir {
@@ -204,6 +203,14 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			}
 		}
 
+		if cost, ok := workers[conf.ElevatorID]; ok {
+			updateElevatorCost(cost, elevatorStatus, &orders, conf.ElevatorID)
+			//Send cost using deep copy
+			//Not critical if multiple of these are sent in wrong order
+			go sendOrderCosts(conf.CostsSend, cost)
+		} else {
+			log.Panicf("Missing elevator cost in costmap")
+		}
 		//Save orders to file
 		err := saveToOrdersFile(conf.FilePath, &orders)
 		if err != nil {
@@ -234,9 +241,11 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 
 		//Find next order and send to elevatorcontroller
 		order := findHighestPriority(&orders, workers[conf.ElevatorID], conf.ElevatorID)
-		if order != nil {
+		//Only send new order if not deeply equal to the last one and not nil
+		if order != nil && !reflect.DeepEqual(*order, prevOrder) {
 			//Guranteed to not block by the receiver runSkipOldOrders
 			orderToElevator <- order.Order
+			prevOrder = *order
 		}
 	}
 }
@@ -322,21 +331,38 @@ func handleElevHallBtnPressed(ctx context.Context, btn elevio.ButtonEvent, costM
 func sendOrderCosts(c chan<- common.OrderCosts, costs *common.OrderCosts) {
 	//DeepCopy slices
 	msg := common.OrderCosts{
-		ID:        costs.ID,
-		CostsDown: append(make([]float64, 0, len(costs.CostsDown)), costs.CostsDown...),
-		CostsUp:   append(make([]float64, 0, len(costs.CostsUp)), costs.CostsUp...),
+		ID:         costs.ID,
+		OrderCount: costs.OrderCount,
+		CostsDown:  append(make([]float64, 0, len(costs.CostsDown)), costs.CostsDown...),
+		CostsUp:    append(make([]float64, 0, len(costs.CostsUp)), costs.CostsUp...),
+		CostsCab:   append(make([]float64, 0, len(costs.CostsCab)), costs.CostsCab...),
 	}
 	c <- msg
 }
 
 //Selects an elevator based on which elevator is the cheapest for that specific order(direction and floor)
 func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Direction) int {
-	minCost := 1000000
+	minCost := math.Inf(1)
 	worker := -1
 	for _, v := range workers {
-		if v.OrderCount < minCost {
-			minCost = v.OrderCount
-			worker = v.ID
+		switch dir {
+		case common.NoDir:
+			if cost := v.CostsCab[floor]; cost < minCost {
+				worker = v.ID
+				minCost = cost
+			}
+		case common.UpDir:
+			if cost := v.CostsUp[floor]; cost < minCost {
+				worker = v.ID
+				minCost = cost
+			}
+		case common.DownDir:
+			if cost := v.CostsDown[floor]; cost < minCost {
+				worker = v.ID
+				minCost = cost
+			}
+		default:
+			log.Panicln("Unknown directio")
 		}
 	}
 	return worker
@@ -355,6 +381,7 @@ func findHighestPriority(orders *schedOrders, cost *common.OrderCosts, id int) *
 		if orderCost < currMinCost {
 			currMinCost = orderCost
 			currOrder = order
+			log.Printf("Best yet (%.1f): %v\n", currMinCost, currOrder)
 		}
 	}
 
@@ -393,6 +420,7 @@ func createOrder(floor int, dir common.Direction, assignee int) *SchedulableOrde
 		},
 		Worker:    assignee,
 		Timestamp: time.Now(),
+		OrderID:   xid.New().String(),
 	}
 }
 
@@ -424,12 +452,10 @@ func handleOrderCompleted(orders *schedOrders, order SchedulableOrder, conf Conf
 		if err := tryRemoveOrderFromSlice(orders.OrdersUp, order.Floor); err != nil {
 			log.Println("Error removing order: ", err)
 		}
-		conf.PrevOrderDir = common.UpDir
 	case common.DownDir:
 		if err := tryRemoveOrderFromSlice(orders.OrdersDown, order.Floor); err != nil {
 			log.Println("Error removing order: ", err)
 		}
-		conf.PrevOrderDir = common.DownDir
 
 	}
 

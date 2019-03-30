@@ -2,7 +2,6 @@ package elevatorcontroller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -41,15 +40,6 @@ func (s state) String() string {
 
 const doorOpenDuration = 3 * time.Second
 
-func trySendElevatorStatus(c chan<- common.ElevatorStatus, status common.ElevatorStatus) error {
-	select {
-	case c <- status:
-		return nil
-	default:
-		return errors.New("Can't send elevator status - Channel not available")
-	}
-}
-
 //Config used to configure the fsm
 type Config struct {
 	ElevatorCommand chan<- elevatordriver.Command
@@ -66,6 +56,7 @@ type fsm struct {
 	timer           *time.Timer
 	elevatorCommand chan<- elevatordriver.Command
 	currentOrder    *common.Order
+	nextOrder       *common.Order
 	orderCompleted  chan<- common.Order
 	status          common.ElevatorStatus
 	statusSend      chan<- common.ElevatorStatus
@@ -119,14 +110,18 @@ func Run(ctx context.Context, conf Config) {
 	for {
 		select {
 		case nextOrder := <-conf.Order:
-			fsm.handleNewOrders(conf, &nextOrder)
+			log.Println("New order")
+			fsm.handleNewOrders(conf, nextOrder)
 		case fsm.status.Floor = <-conf.ArrivedAtFloor:
 			fsm.handleAtFloor(conf)
+			log.Println("New floor")
 		case <-fsm.timer.C:
-			fsm.handleTimerElapsed()
+			fsm.handleTimerElapsed(conf)
+			log.Println("New timer")
 		case <-ctx.Done():
 			break
 		}
+		elevatorStatus <- fsm.status
 	}
 }
 
@@ -136,16 +131,12 @@ func (f *fsm) init(conf Config) {
 	f.status.Floor = <-conf.ArrivedAtFloor
 	f.elevatorCommand <- elevatordriver.Stop
 	f.status.Dir = common.NoDir
-	f.status.Dir = common.NoDir
 	f.statusSend <- f.status
 }
 
 //Handles incomming orders from the scheduler module
-func (f *fsm) handleNewOrders(conf Config, order *common.Order) {
+func (f *fsm) handleNewOrders(conf Config, order common.Order) {
 
-	if order == nil {
-		return
-	}
 	//Initializes variables for the statemachine
 	targetFloor := order.Floor
 	currentFloor := f.status.Floor
@@ -156,66 +147,87 @@ func (f *fsm) handleNewOrders(conf Config, order *common.Order) {
 		log.Panic()
 	}
 
+	//Clear next order - order is the new order
+	f.nextOrder = nil
+
+	switch order.Dir {
+	case common.NoDir:
+		if orderAbove(order, currentFloor) {
+			f.status.Dir = common.UpDir
+		} else if order.Floor != currentFloor {
+			f.status.Dir = common.DownDir
+		}
+	case common.DownDir, common.UpDir:
+		f.status.Dir = order.Dir
+	default:
+		log.Panicln("Unknown direction")
+	}
 	switch f.state {
 	case stateMovingDown:
-		f.currentOrder = order
-		if f.orderAbove(currentFloor) || currentFloor == targetFloor {
+		f.currentOrder = &order
+		//Set state to current order dir
+		if orderAbove(order, currentFloor) || currentFloor == targetFloor {
 			f.transitionToMovingUp(conf)
 		}
 	case stateMovingUp:
-		f.currentOrder = order
-		if !f.orderAbove(currentFloor) || currentFloor == targetFloor {
+		f.currentOrder = &order
+		//Set state to current order dir
+		if !orderAbove(order, currentFloor) || currentFloor == targetFloor {
 			f.transitionToMovingDown(conf)
 		}
 
 	case stateDoorClosed:
-		f.currentOrder = order
+		f.currentOrder = &order
+		//Set state to current order dir
 		if currentFloor == targetFloor {
-			f.transitionToDoorOpen()
-		} else if f.orderAbove(currentFloor) {
+			f.transitionToDoorOpen(conf)
+		} else if orderAbove(order, currentFloor) {
 			f.transitionToMovingUp(conf)
 		} else {
 			f.transitionToMovingDown(conf)
 		}
+	case stateDoorOpen:
+		f.nextOrder = &order
 	}
+
 }
 
 //Handles events that occur when reaching a new floow
 func (f *fsm) handleAtFloor(conf Config) { //julie
-	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
-		log.Println(err)
-	}
+	f.statusSend <- f.status
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
 		if f.shouldStop(f.status.Floor) {
-			f.transitionToDoorOpen()
+			f.transitionToDoorOpen(conf)
 		}
 	}
 }
 
 //Handles transition from one state to the open door
-func (f *fsm) transitionToDoorOpen() {
+func (f *fsm) transitionToDoorOpen(conf Config) {
 	log.Println("Transition to door open")
 	f.elevatorCommand <- elevatordriver.Stop
 	f.elevatorCommand <- elevatordriver.OpenDoor
 	f.timer.Reset(doorOpenDuration)
-	f.state = stateDoorOpen
 	f.status.Moving = false
+	f.state = stateDoorOpen
 
 }
 
 //Handles transition from one state to door closed
-func (f *fsm) transitionToDoorClosed() {
+func (f *fsm) transitionToDoorClosed(conf Config) {
 	log.Println("Transition to door closed")
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Moving = false
-	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
-		log.Println(err)
-	}
-	f.state = stateDoorClosed
 	if f.currentOrder != nil {
 		f.orderCompleted <- *f.currentOrder
 		f.currentOrder = nil
+	}
+	//Handle next order
+	f.state = stateDoorClosed
+	//Handle next order if it exists
+	if f.nextOrder != nil {
+		f.handleNewOrders(conf, *f.nextOrder)
 	}
 }
 
@@ -224,11 +236,7 @@ func (f *fsm) transitionToMovingDown(conf Config) {
 	log.Println("Transition to moving down")
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
-	f.status.Dir = common.DownDir
 	f.status.Moving = true
-	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
-		log.Println(err)
-	}
 	fmt.Println(f.status)
 	f.state = stateMovingDown
 }
@@ -238,19 +246,13 @@ func (f *fsm) transitionToMovingUp(conf Config) {
 	log.Println("Transition to moving up")
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
-	f.status.Dir = common.UpDir
 	f.status.Moving = true
-	log.Println("Start")
-	if err := trySendElevatorStatus(f.statusSend, f.status); err != nil {
-		log.Println(err)
-	}
-	log.Println("End")
 	f.state = stateMovingUp
 }
 
 //Checking if new order is above or below current floor of the elevator
-func (f *fsm) orderAbove(floor int) bool {
-	targetFloor := f.currentOrder.Floor
+func orderAbove(order common.Order, floor int) bool {
+	targetFloor := order.Floor
 	if targetFloor > floor {
 		return true
 	}
@@ -266,9 +268,9 @@ func (f *fsm) shouldStop(floor int) bool {
 }
 
 //Handles switching of state when door-open-timer has elapsed
-func (f *fsm) handleTimerElapsed() {
+func (f *fsm) handleTimerElapsed(conf Config) {
 	switch f.state {
 	case stateDoorOpen:
-		f.transitionToDoorClosed()
+		f.transitionToDoorClosed(conf)
 	}
 }
