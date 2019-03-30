@@ -229,7 +229,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		}
 
 		//Find next order and send to elevatorcontroller
-		order := getCheapestOrder(&orders, workers[conf.ElevatorID], conf.ElevatorID)
+		order := getCheapestActiveOrder(&orders, workers[conf.ElevatorID], conf.ElevatorID)
 		//Only send new order if not deeply equal to the last one and not nil
 		if order != nil && !reflect.DeepEqual(*order, prevOrder) {
 			//Guranteed to not block by the receiver runSkipOldOrders
@@ -385,7 +385,7 @@ func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Dire
 }
 
 //Finds the order with the lowest cost
-func getCheapestOrder(orders *schedOrders, cost *common.OrderCosts, id int) *SchedulableOrder {
+func getCheapestActiveOrder(orders *schedOrders, cost *common.OrderCosts, id int) *SchedulableOrder {
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
 	//Check cab calls
