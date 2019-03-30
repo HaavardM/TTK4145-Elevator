@@ -1,9 +1,10 @@
 package network
 
 import (
-	"context"
 	"log"
 	"reflect"
+
+	"golang.org/x/net/context"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 )

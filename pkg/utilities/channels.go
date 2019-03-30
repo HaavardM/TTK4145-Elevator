@@ -1,10 +1,11 @@
 package utilities
 
 import (
-	"context"
 	"errors"
 	"log"
 	"reflect"
+
+	"golang.org/x/net/context"
 )
 
 //ReflectChan2InterfaceChan creates a interface channel for any reflect channel

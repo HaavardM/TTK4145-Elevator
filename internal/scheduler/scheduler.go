@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -9,6 +8,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/rs/xid"
 

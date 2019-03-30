@@ -1,4 +1,4 @@
-FROM golang:1.11
+FROM golang:1.6
 
 EXPOSE 15657
 WORKDIR $GOPATH/src/github.com/TTK4145-students-2019/project-thefuturezebras

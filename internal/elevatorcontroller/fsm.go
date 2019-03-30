@@ -1,10 +1,11 @@
 package elevatorcontroller
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
