@@ -217,27 +217,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			log.Panic(err)
 		}
 
-		//Set order lights
-		for floor, order := range orders.OrdersUp {
-			//No up light in top floor
-			if floor >= conf.NumFloors {
-				continue
-			}
-			//Receiver never blocks
-			conf.Lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.UpButtonLight, State: (order != nil)}
-		}
-		for floor, order := range orders.OrdersDown {
-			//No down light in base floor
-			if floor <= 0 {
-				continue
-			}
-			//Receiver never blocks
-			conf.Lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.DownButtonLight, State: (order != nil)}
-		}
-		for floor, order := range orders.OrdersCab {
-			//Receiver never blocks
-			conf.Lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.InternalButtonLight, State: (order != nil)}
-		}
+		//Update status lights based on updated orders
+		setLightsFromOrders(orders, conf.Lights, conf.NumFloors)
 
 		//Find next order and send to elevatorcontroller
 		order := findHighestPriority(&orders, workers[conf.ElevatorID], conf.ElevatorID)
@@ -248,6 +229,31 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			prevOrder = *order
 		}
 	}
+}
+
+func setLightsFromOrders(orders schedOrders, lights chan<- elevatordriver.LightState, numFloors int) {
+	//Set order lights
+	for floor, order := range orders.OrdersUp {
+		//No up light in top floor
+		if floor >= numFloors {
+			continue
+		}
+		//Receiver never blocks
+		lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.UpButtonLight, State: (order != nil)}
+	}
+	for floor, order := range orders.OrdersDown {
+		//No down light in base floor
+		if floor <= 0 {
+			continue
+		}
+		//Receiver never blocks
+		lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.DownButtonLight, State: (order != nil)}
+	}
+	for floor, order := range orders.OrdersCab {
+		//Receiver never blocks
+		lights <- elevatordriver.LightState{Floor: floor, Type: elevatordriver.InternalButtonLight, State: (order != nil)}
+	}
+
 }
 
 func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout time.Duration, workers map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {

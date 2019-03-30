@@ -121,6 +121,10 @@ func Run(ctx context.Context, conf Config) {
 		case <-ctx.Done():
 			break
 		}
+		//Handle new order if it exists
+		if fsm.nextOrder != nil {
+			fsm.handleNewOrders(conf, *fsm.nextOrder)
+		}
 		elevatorStatus <- fsm.status
 	}
 }
@@ -130,7 +134,7 @@ func (f *fsm) init(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.status.Floor = <-conf.ArrivedAtFloor
 	f.elevatorCommand <- elevatordriver.Stop
-	f.status.Dir = common.NoDir
+	f.status.OrderDir = common.NoDir
 	f.statusSend <- f.status
 }
 
@@ -150,18 +154,21 @@ func (f *fsm) handleNewOrders(conf Config, order common.Order) {
 	//Clear next order - order is the new order
 	f.nextOrder = nil
 
+	//Set the status direction to the prefered direction of travel
 	switch order.Dir {
 	case common.NoDir:
 		if orderAbove(order, currentFloor) {
-			f.status.Dir = common.UpDir
+			f.status.OrderDir = common.UpDir
 		} else if order.Floor != currentFloor {
-			f.status.Dir = common.DownDir
+			f.status.OrderDir = common.DownDir
 		}
 	case common.DownDir, common.UpDir:
-		f.status.Dir = order.Dir
+		f.status.OrderDir = order.Dir
 	default:
 		log.Panicln("Unknown direction")
 	}
+
+	//handle new order based on current state
 	switch f.state {
 	case stateMovingDown:
 		f.currentOrder = &order
@@ -187,6 +194,7 @@ func (f *fsm) handleNewOrders(conf Config, order common.Order) {
 			f.transitionToMovingDown(conf)
 		}
 	case stateDoorOpen:
+		//We have to wait for the doors to close before executing next order
 		f.nextOrder = &order
 	}
 
@@ -223,12 +231,7 @@ func (f *fsm) transitionToDoorClosed(conf Config) {
 		f.orderCompleted <- *f.currentOrder
 		f.currentOrder = nil
 	}
-	//Handle next order
 	f.state = stateDoorClosed
-	//Handle next order if it exists
-	if f.nextOrder != nil {
-		f.handleNewOrders(conf, *f.nextOrder)
-	}
 }
 
 //handles transition from one state to moving down

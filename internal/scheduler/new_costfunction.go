@@ -43,7 +43,7 @@ func updateElevatorCost(costs *common.OrderCosts, status common.ElevatorStatus, 
 		var currCost []float64
 		startFloor := status.Floor
 
-		if status.Dir == common.UpDir {
+		if status.OrderDir == common.UpDir {
 			searchDir = 1
 			currentQueue = orders.OrdersUp
 			currCost = newCost.CostsUp
