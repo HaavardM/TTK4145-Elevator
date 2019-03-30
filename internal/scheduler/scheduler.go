@@ -206,10 +206,12 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		//Update elevators cost
 		if cost, ok := workers[conf.ElevatorID]; ok {
 			newCost := createElevatorCost(elevatorStatus, &orders, conf.ElevatorID)
-			*cost = newCost
-			//Send cost using deep copy
-			//Not critical if multiple of these are sent in wrong order
-			go sendOrderCosts(conf.CostsSend, cost)
+			if !reflect.DeepEqual(*cost, newCost) {
+				*cost = newCost
+				//Send cost using deep copy
+				//Not critical if multiple of these are sent in wrong order
+				go sendOrderCosts(conf.CostsSend, cost)
+			}
 		} else {
 			log.Panicf("Missing elevator cost in costmap")
 		}
