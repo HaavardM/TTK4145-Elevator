@@ -200,9 +200,7 @@ func (f *fsm) handleNewOrders(conf Config, order common.Order) {
 }
 
 //Handles events that occur when reaching a new floow
-func (f *fsm) handleAtFloor(conf Config) {
-	//Send change in elevator status
-	f.statusSend <- f.status
+func (f *fsm) handleAtFloor(conf Config) { 
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
 		if f.shouldStop(f.status.Floor) {
