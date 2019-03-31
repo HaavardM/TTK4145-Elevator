@@ -106,8 +106,8 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		},
 	}
 
-	orderTimeout := 20 * time.Second
-	orderTimeoutTicker := time.NewTicker(5*time.Second)
+	orderTimeout := 15 * time.Second
+	orderTimeoutTicker := time.NewTicker(time.Second)
 	//Channel used to avoid select blocking when neccessary
 	skipSelect := make(chan struct{}, 1)
 
