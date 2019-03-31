@@ -107,7 +107,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 	}
 
 	orderTimeout := 20 * time.Second
-	orderTimeoutTicker := time.NewTicker(orderTimeout)
+	orderTimeoutTicker := time.NewTicker(5*time.Second)
 	//Channel used to avoid select blocking when neccessary
 	skipSelect := make(chan struct{}, 1)
 
@@ -149,6 +149,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			delete(workers, id)
 			reassignInvalidOrders(ctx, &orders, orderTimeout, workers, conf.NewOrderSend)
 		case <-orderTimeoutTicker.C:
+			log.Println("timeout")
 			reassignInvalidOrders(ctx, &orders, orderTimeout, workers, conf.NewOrderSend)
 		case elevatorStatus = <-conf.ElevStatus:
 			//Updates elevator stauts
@@ -272,6 +273,7 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 	hallOrders := make([]*SchedulableOrder, 0, len(orders.HallDown)+len(orders.HallUp))
 	hallOrders = append(hallOrders, orders.HallDown...)
 	hallOrders = append(hallOrders, orders.HallUp...)
+	log.Printf("%+v\n", hallOrders)
 	//Check for timeout or invalid assignee
 	for _, order := range hallOrders {
 		renewOrder := false
@@ -282,6 +284,7 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 		//Check if timeout have passed
 		if time.Now().Sub(order.Timestamp) > timeout {
 			renewOrder = true
+			log.Println("Order timeout")
 		}
 
 		//If order is completed and has been for some time
