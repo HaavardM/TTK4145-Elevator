@@ -155,20 +155,6 @@ func (f *fsm) handleNewOrders(conf Config, order common.Order) {
 	//Clear next order - order is the new order
 	f.nextOrder = nil
 
-	//Set the status direction to the prefered direction of travel
-	switch order.Dir {
-	case common.NoDir:
-		if orderAbove(order, currentFloor) {
-			f.status.OrderDir = common.UpDir
-		} else if order.Floor != currentFloor {
-			f.status.OrderDir = common.DownDir
-		}
-	case common.DownDir, common.UpDir:
-		f.status.OrderDir = order.Dir
-	default:
-		log.Panicln("Unknown direction")
-	}
-
 	//Handle new order based on current state
 	switch f.state {
 	case stateMovingDown:
@@ -201,7 +187,7 @@ func (f *fsm) handleNewOrders(conf Config, order common.Order) {
 }
 
 //Handles events that occur when reaching a new floow
-func (f *fsm) handleAtFloor(conf Config) { 
+func (f *fsm) handleAtFloor(conf Config) {
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
 		if f.shouldStop(f.status.Floor) {
@@ -217,6 +203,9 @@ func (f *fsm) transitionToDoorOpen(conf Config) {
 	f.elevatorCommand <- elevatordriver.OpenDoor
 	f.timer.Reset(doorOpenDuration)
 	f.status.Moving = false
+	if f.currentOrder != nil {
+		f.status.OrderDir = f.currentOrder.Dir
+	}
 	f.state = stateDoorOpen
 }
 
@@ -226,6 +215,7 @@ func (f *fsm) transitionToDoorClosed(conf Config) {
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Moving = false
 	if f.currentOrder != nil {
+		f.status.OrderDir = f.currentOrder.Dir
 		f.orderCompleted <- *f.currentOrder
 		f.currentOrder = nil
 	}
@@ -238,6 +228,7 @@ func (f *fsm) transitionToMovingDown(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Moving = true
+	f.status.OrderDir = common.DownDir
 	fmt.Println(f.status)
 	f.state = stateMovingDown
 }
@@ -248,6 +239,7 @@ func (f *fsm) transitionToMovingUp(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Moving = true
+	f.status.OrderDir = common.UpDir
 	f.state = stateMovingUp
 }
 
