@@ -1,6 +1,7 @@
 package elevatorcontroller
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -54,14 +55,15 @@ type Config struct {
 
 //Struct containing variables and channels used by the statemachine
 type fsm struct {
-	state           state
-	timer           *time.Timer
-	elevatorCommand chan<- elevatordriver.Command
-	currentOrder    *common.Order
-	nextOrder       *common.Order
-	orderCompleted  chan<- common.Order
-	status          common.ElevatorStatus
-	statusSend      chan<- common.ElevatorStatus
+	state              state
+	timer              *time.Timer
+	elevatorCommand    chan<- elevatordriver.Command
+	currentOrder       *common.Order
+	nextOrder          *common.Order
+	orderCompleted     chan<- common.Order
+	status             common.ElevatorStatus
+	statusSend         chan<- common.ElevatorStatus
+	lastFloorTimestamp time.Time
 }
 
 //runSendLatestElevatorStatus sends a message with the elevator status if it has changed
@@ -121,6 +123,11 @@ func Run(ctx context.Context, conf Config) {
 		case <-ctx.Done():
 			break
 		}
+
+		if fsm.status.Error == nil && fsm.status.Moving && time.Now().Sub(fsm.lastFloorTimestamp) > 5*time.Second {
+			log.Println("Elevator not responding")
+			fsm.status.Error = errors.New("Elevator not responding")
+		}
 		//Handle orders that have been buffer stored while elevator was
 		//in door-open state and could not execute a new order
 		if fsm.nextOrder != nil {
@@ -134,6 +141,7 @@ func Run(ctx context.Context, conf Config) {
 func (f *fsm) init(conf Config) {
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.status.Floor = <-conf.ArrivedAtFloor
+	f.lastFloorTimestamp = time.Now()
 	f.elevatorCommand <- elevatordriver.Stop
 	f.status.OrderDir = common.NoDir
 	f.statusSend <- f.status
@@ -188,6 +196,7 @@ func (f *fsm) handleNewOrders(conf Config, order common.Order) {
 
 //Handles events that occur when reaching a new floow
 func (f *fsm) handleAtFloor(conf Config) {
+	f.lastFloorTimestamp = time.Now()
 	switch f.state {
 	case stateMovingUp, stateMovingDown:
 		if f.shouldStop(f.status.Floor) {

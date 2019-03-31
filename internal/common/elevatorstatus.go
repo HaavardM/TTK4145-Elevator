@@ -5,4 +5,5 @@ type ElevatorStatus struct {
 	OrderDir Direction
 	Moving   bool
 	Floor    int
+	Error    error
 }
