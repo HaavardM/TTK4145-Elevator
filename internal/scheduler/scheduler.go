@@ -139,8 +139,6 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		//All blocking operations handled in select!
 		select {
 		case <-ctx.Done():
-			//Delete orders file on clean exit
-			//deleteOrdersFile(conf.FilePath)
 			return
 		case <-skipSelect:
 			//Continue after select
