@@ -124,6 +124,10 @@ func Run(ctx context.Context, conf Config) {
 		case <-time.After(time.Second):
 		}
 
+		if !fsm.status.Moving {
+			//Reset timestamp if not moving
+			fsm.lastFloorTimestamp = time.Now()
+		}
 		if time.Now().Sub(fsm.lastFloorTimestamp) > 5*time.Second && fsm.status.Moving {
 			if !fsm.status.Error {
 				log.Println("Elevator not responding")
