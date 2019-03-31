@@ -121,6 +121,7 @@ func Run(ctx context.Context, conf Config) {
 			fsm.handleTimerElapsed(conf)
 		case <-ctx.Done():
 			break
+		case <-time.After(time.Second):
 		}
 
 		if time.Now().Sub(fsm.lastFloorTimestamp) > 5*time.Second && fsm.status.Moving {
