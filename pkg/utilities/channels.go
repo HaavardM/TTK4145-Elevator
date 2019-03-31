@@ -114,7 +114,7 @@ func ManyToOneChan(ctx context.Context, out interface{}, in ...interface{}) {
 	}
 }
 
-//ConstantPublisher publishes a fixed value to a channel when channel is available
+//ConstantPublisher publishes a fixed value to a channel when available
 func ConstantPublisher(ctx context.Context, channel interface{}, value interface{}) {
 	rChan := reflect.ValueOf(channel)
 	rValue := reflect.ValueOf(value)

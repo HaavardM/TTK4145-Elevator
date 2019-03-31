@@ -55,6 +55,5 @@ func RunAtMostOnce(ctx context.Context, conf AtMostOnceConfig) {
 			valuePtr := reflect.ValueOf(m)           //Pointer type
 			outChan.Send(reflect.Indirect(valuePtr)) //Get actual value
 		}
-
 	}
 }

@@ -7,8 +7,8 @@ import (
 	"os"
 )
 
-//turning an array of orders into json format before saving to a file. Saves to temporary file before
-//overwriting to make sure no data is lost if an error occurs.
+//Turning an array of orders into json format before saving to a file. Saves to temporary file before
+//overwriting to make sure no data is lost if an error occurs
 func saveToOrdersFile(filePath string, currentOrders *schedOrders) error {
 	tofile, err := json.Marshal(currentOrders)
 	if err != nil {
@@ -29,7 +29,7 @@ func saveToOrdersFile(filePath string, currentOrders *schedOrders) error {
 
 //Reads orders from a file and turn them back into an array of Order type from json format
 func readFromOrdersFile(filePath string) (*schedOrders, error) {
-	//opens the json file and saves it to the variable jsonOrders
+	//Opens the json file and saves it to the variable jsonOrders
 	jsonOrders, err := os.Open(filePath)
 	if err != nil {
 		return nil, err

@@ -13,12 +13,14 @@ import (
 
 	"github.com/rs/xid"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
-
 	"github.com/davecgh/go-spew/spew"
 
+	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
+
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
+
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
+
 	"github.com/TTK4145/driver-go/elevio"
 )
 
@@ -80,7 +82,6 @@ func runSendLatestOrder(ctx context.Context, sendChan chan<- common.Order, order
 			}
 		}
 	}
-
 }
 
 //Run is the startingpoint for the scheduler module
@@ -112,7 +113,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 
 	//To avoid deadlocking, we do not want to block the main scheduler thread.
 	//The runSkipOldOrders acts as a "middleman", storing the latest order and sends it when
-	//the elevatorcontroller is ready.
+	//the elevatorcontroller is ready
 	orderToElevator := make(chan common.Order)
 	go runSendLatestOrder(ctx, conf.ElevExecuteOrder, orderToElevator)
 
@@ -240,6 +241,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 	}
 }
 
+//setLightsFromOrders sets the order lights when the order is confirmed and saved to file 
 func setLightsFromOrders(orders schedOrders, lights chan<- elevatordriver.LightState, numFloors int) {
 	//Set order lights
 	for floor, order := range orders.HallUp {
@@ -265,6 +267,7 @@ func setLightsFromOrders(orders schedOrders, lights chan<- elevatordriver.LightS
 
 }
 
+//Reassigns orders that have timed out as if it was a new order
 func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout time.Duration, workers map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
 	hallOrders := make([]*SchedulableOrder, 0, len(orders.HallDown)+len(orders.HallUp))
 	hallOrders = append(hallOrders, orders.HallDown...)
@@ -311,6 +314,7 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 	}
 }
 
+//Sends all current hall orders on the network
 func publishAllHallOrders(ctx context.Context, orders *schedOrders, send chan<- SchedulableOrder) {
 	//Get hall orders
 	hallOrders := make([]*SchedulableOrder, 0, len(orders.HallDown)+len(orders.HallUp))
@@ -325,6 +329,7 @@ func publishAllHallOrders(ctx context.Context, orders *schedOrders, send chan<- 
 	}
 }
 
+//Handles events related to a hall button pressed such as creating an order and assigning an elevator
 func handleElevHallBtnPressed(ctx context.Context, btn elevio.ButtonEvent, costMap map[int]*common.OrderCosts, sendOrder chan<- SchedulableOrder) {
 	switch btn.Button {
 	case elevio.BT_HallDown:
@@ -379,16 +384,17 @@ func selectWorker(workers map[int]*common.OrderCosts, floor int, dir common.Dire
 				minCost = cost
 			}
 		default:
-			log.Panicln("Unknown directio")
+			log.Panicln("Unknown direction")
 		}
 	}
 	return worker
 }
 
-//Finds the order with the lowest cost
+//Chooses the cheapest order as the next order to be executed
 func getCheapestActiveOrder(orders *schedOrders, cost *common.OrderCosts, id int) *SchedulableOrder {
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
+
 	//Check cab calls
 	for _, order := range orders.Cab {
 		if order == nil || order.Worker != id || order.completed != nil {
@@ -440,7 +446,7 @@ func createOrder(floor int, dir common.Direction, assignee int) *SchedulableOrde
 	}
 }
 
-//
+//Handles orders that have already been created and tries to add them to a slice of same types of orders
 func handleNewOrder(orders *schedOrders, order SchedulableOrder) error {
 	switch order.Dir {
 	case common.UpDir:

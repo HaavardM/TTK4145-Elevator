@@ -1,6 +1,6 @@
 package common
 
-//OrderCosts contains the cost of an order to the different floors in one direction
+//OrderCosts contains ID of an elevator, number of orders the elevator has and its cost to the different floors.
 type OrderCosts struct {
 	ID         int       `json:"id"`
 	OrderCount int       `json:"order_count"`
