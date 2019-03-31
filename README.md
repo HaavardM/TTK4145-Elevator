@@ -43,10 +43,6 @@ The lights and buttons should function as expected
  - The cab and hall button lights should turn off when the corresponding order has been serviced
  - The "door open" lamp should be used as a substitute for an actual door, and as such should not be switched on while the elevator is moving
 
- 
-Start with `1 <= n <= 3` elevators, and `m == 4` floors. Try to avoid hard-coding these values: You should be able to add a fourth elevator with no extra configuration, or change the number of floors with minimal configuration. You do, however, not need to test for `n > 3` and `m != 4`.
-
-   
 Permitted assumptions
 ---------------------
 

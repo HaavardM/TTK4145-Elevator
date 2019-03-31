@@ -8,4 +8,4 @@ Module: Elevator Controller
 ## External packages
 |Package Name|Description|Reason|
 |------------|-----------|------|
-|[context](https://golang.org/x/net/context)| |To stop the goroutine if the context expires|
+|[context](https://golang.org/x/net/context)|Goroutine context management (included in standard library from Golang 1.7)|To stop the goroutine if the context is no longer valid|
