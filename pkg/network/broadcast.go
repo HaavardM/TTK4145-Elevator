@@ -1,11 +1,12 @@
 package network
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"reflect"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 )
@@ -56,7 +57,6 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 			SenderID: -1,
 			Data:     reflect.New(T).Interface(),
 		}
-		//fmt.Printf("%s\n", buf[0:n])
 		err = json.Unmarshal(buf[0:n], msg)
 		if err != nil {
 			log.Println(err)
@@ -66,7 +66,6 @@ func broadcastReceiver(ctx context.Context, port int, id int, message chan<- int
 				go utilities.SendMessage(ctx, message, msg.Data)
 			}
 		}
-
 	}
 }
 

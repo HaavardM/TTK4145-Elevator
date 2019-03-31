@@ -1,11 +1,12 @@
 package network
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"reflect"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 )
@@ -92,7 +93,6 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 		case <-heartbeatTicker.C:
 			sendHeartbeatChan <- cost
 		}
-
 	}
 }
 

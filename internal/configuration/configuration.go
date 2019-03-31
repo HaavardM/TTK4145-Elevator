@@ -17,7 +17,7 @@ type Config struct {
 	FilePath     string
 }
 
-//GetConfig returs config based on default values and provided flags
+//GetConfig returns config based on default values and provided flags
 func GetConfig() Config {
 	conf := Config{}
 	currentDir, err := os.Getwd()
@@ -38,6 +38,5 @@ func GetConfig() Config {
 			log.Panicln(err)
 		}
 	}
-
 	return conf
 }

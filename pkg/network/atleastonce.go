@@ -1,13 +1,14 @@
 package network
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"reflect"
 	"time"
 
+	"golang.org/x/net/context"
+	
 	"github.com/rs/xid"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"

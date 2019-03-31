@@ -1,9 +1,10 @@
 package network
 
 import (
-	"context"
 	"log"
 	"reflect"
+
+	"golang.org/x/net/context"
 
 	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 )
@@ -54,6 +55,5 @@ func RunAtMostOnce(ctx context.Context, conf AtMostOnceConfig) {
 			valuePtr := reflect.ValueOf(m)           //Pointer type
 			outChan.Send(reflect.Indirect(valuePtr)) //Get actual value
 		}
-
 	}
 }

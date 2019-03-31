@@ -2,7 +2,7 @@ package common
 
 import "fmt"
 
-//Direction specifies a direction for order or the elevator
+//Direction specifies a direction for an order or the elevator
 type Direction int
 
 const (
@@ -15,7 +15,7 @@ const (
 	NoDir
 )
 
-//String returns a string representation of the direction
+//Returns a string representation of the direction
 func (d Direction) String() string {
 	switch d {
 	case UpDir:

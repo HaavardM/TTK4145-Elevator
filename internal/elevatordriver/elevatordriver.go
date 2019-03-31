@@ -1,8 +1,9 @@
 package elevatordriver
 
 import (
-	"context"
 	"errors"
+
+	"golang.org/x/net/context"
 
 	"github.com/TTK4145/driver-go/elevio"
 )
