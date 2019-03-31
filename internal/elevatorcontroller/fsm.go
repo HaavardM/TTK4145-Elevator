@@ -40,7 +40,7 @@ func (s state) String() string {
 	}
 }
 
-const doorOpenDuration = 3 * time.Second
+const doorOpenDuration = 2 * time.Second
 
 //Config used to configure the fsm
 type Config struct {
@@ -134,6 +134,9 @@ func Run(ctx context.Context, conf Config) {
 			}
 			fsm.status.Error = true
 		} else {
+			if fsm.status.Error {
+				log.Println("Elevator works fine again :)")
+			}
 			fsm.status.Error = false
 		}
 		//Handle orders that have been buffer stored while elevator was
