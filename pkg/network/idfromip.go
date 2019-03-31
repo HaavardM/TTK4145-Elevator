@@ -14,7 +14,7 @@ func GetIDFromIP() (int, error) {
 		return 0, err
 	}
 
-	strRes := strings.Join(strings.Split(ip, "."), "")
+	strRes := strings.Join(strings.Split(ip, ".")[2:], "")
 	res, err := strconv.Atoi(strRes)
 	if err != nil {
 		return 0, err

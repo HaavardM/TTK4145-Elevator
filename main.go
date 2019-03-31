@@ -154,6 +154,10 @@ func main() {
 	sig := make(chan os.Signal)
 	go handleSignals(sig, cancel)
 	signal.Notify(sig, os.Interrupt, os.Kill)
+
+	//Greeting
+	log.Println("Elevator ready with id ", conf.ElevatorID)
+
 	//Wait for shutdown
 	<-ctx.Done()
 
