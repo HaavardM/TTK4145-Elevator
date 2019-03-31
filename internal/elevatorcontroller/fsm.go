@@ -121,7 +121,8 @@ func Run(ctx context.Context, conf Config) {
 		case <-ctx.Done():
 			break
 		}
-		//Handle new order if it exists
+		//Handle orders that have been buffer stored while elevator was
+		//in door-open state and could not execute a new order
 		if fsm.nextOrder != nil {
 			fsm.handleNewOrders(conf, *fsm.nextOrder)
 		}
