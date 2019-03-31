@@ -47,7 +47,7 @@ func main() {
 	//We do not require the scheduler and elevatorcontroller to be in perfect sync,
 	//but the order of the messages sent on these channels must be correct
 	order := make(chan common.Order, 1)
-	elevatorInfo := make(chan common.ElevatorStatus, 1) //julie
+	elevatorInfo := make(chan common.ElevatorStatus, 1)
 
 	topicNewOrderSend := make(chan scheduler.SchedulableOrder)
 	topicNewOrderRecv := make(chan scheduler.SchedulableOrder)
@@ -77,7 +77,7 @@ func main() {
 		ArrivedAtFloor:  arrivedAtFloor,
 		NumberOfFloors:  conf.Floors,
 		OrderCompleted:  orderCompleted,
-		ElevatorStatus:  elevatorInfo, //julie
+		ElevatorStatus:  elevatorInfo,
 	}
 
 	topicNewOrderConf := network.AtLeastOnceConfig{
@@ -142,13 +142,6 @@ func main() {
 	//Wait for scheduler to complete
 	waitGroup.Add(1)
 	go scheduler.Run(ctx, &waitGroup, schedulerConf)
-
-	/*
-		go func() {
-			time.Sleep(10 * time.Second)
-			log.Panic("SOME PANIC")
-		}()
-	*/
 
 	//Handle signals to get a graceful shutdown
 	sig := make(chan os.Signal)
