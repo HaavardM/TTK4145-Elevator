@@ -24,7 +24,7 @@ func createElevatorCost(status common.ElevatorStatus, orders *schedOrders, id in
 		HallDown:   make([]float64, len(orders.HallDown)), //All zeros
 	}
 
-	if status.Error != nil {
+	if status.Error {
 		extraPenalty *= 1000
 	}
 

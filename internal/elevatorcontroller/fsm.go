@@ -1,7 +1,6 @@
 package elevatorcontroller
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -124,9 +123,13 @@ func Run(ctx context.Context, conf Config) {
 			break
 		}
 
-		if fsm.status.Error == nil && fsm.status.Moving && time.Now().Sub(fsm.lastFloorTimestamp) > 5*time.Second {
-			log.Println("Elevator not responding")
-			fsm.status.Error = errors.New("Elevator not responding")
+		if time.Now().Sub(fsm.lastFloorTimestamp) > 5*time.Second && fsm.status.Moving {
+			if !fsm.status.Error {
+				log.Println("Elevator not responding")
+			}
+			fsm.status.Error = true
+		} else {
+			fsm.status.Error = false
 		}
 		//Handle orders that have been buffer stored while elevator was
 		//in door-open state and could not execute a new order
