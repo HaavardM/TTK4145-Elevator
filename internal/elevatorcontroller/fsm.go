@@ -1,7 +1,6 @@
 package elevatorcontroller
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -218,7 +217,6 @@ func (f *fsm) handleAtFloor(conf Config) {
 
 //Handles transition from one state to the open door state
 func (f *fsm) transitionToDoorOpen(conf Config) {
-	log.Println("Transition to door open")
 	f.elevatorCommand <- elevatordriver.Stop
 	f.elevatorCommand <- elevatordriver.OpenDoor
 	f.timer.Reset(doorOpenDuration)
@@ -231,7 +229,6 @@ func (f *fsm) transitionToDoorOpen(conf Config) {
 
 //Handles transition from one state to door closed state
 func (f *fsm) transitionToDoorClosed(conf Config) {
-	log.Println("Transition to door closed")
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Moving = false
 	if f.currentOrder != nil {
@@ -244,18 +241,15 @@ func (f *fsm) transitionToDoorClosed(conf Config) {
 
 //Handles transition from one state to moving down state
 func (f *fsm) transitionToMovingDown(conf Config) {
-	log.Println("Transition to moving down")
 	f.elevatorCommand <- elevatordriver.MoveDown
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Moving = true
 	f.status.OrderDir = common.DownDir
-	fmt.Println(f.status)
 	f.state = stateMovingDown
 }
 
 //Handles transition from one state to moving up state
 func (f *fsm) transitionToMovingUp(conf Config) {
-	log.Println("Transition to moving up")
 	f.elevatorCommand <- elevatordriver.MoveUp
 	f.elevatorCommand <- elevatordriver.CloseDoor
 	f.status.Moving = true

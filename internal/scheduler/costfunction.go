@@ -111,7 +111,6 @@ func createElevatorCost(status common.ElevatorStatus, orders *schedOrders, id in
 			costCounter++
 		}
 	}
-
 	//Set the new costs
 	return newCost
 }

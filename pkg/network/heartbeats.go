@@ -2,7 +2,6 @@ package network
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"time"
 
@@ -59,7 +58,6 @@ func RunHeartbeat(ctx context.Context, conf HeartbeatConfig, onlineElevators ...
 			return
 
 		case cost = <-conf.CostIn:
-			log.Printf("New local cost %v\n", cost)
 
 		case hbt := <-recvHeartbeatChan:
 			_, idfound := mapLastHeartbeat[hbt.ID]

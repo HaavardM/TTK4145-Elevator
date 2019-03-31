@@ -109,8 +109,6 @@ func broadcastTransmitter(ctx context.Context, port int, id int, message <-chan 
 			if err != nil {
 				log.Println("Failed to write - attempting reconnect")
 				go utilities.SendMessage(ctx, noConn, err)
-				//Do not skip message
-				go utilities.SendMessage(ctx, transmitQueue, m)
 			}
 		}
 	}

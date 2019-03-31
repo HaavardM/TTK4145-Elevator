@@ -24,6 +24,6 @@ When a message is acknowlegded by all other elevators, the message is sent back 
 |------------|-----------|------|
 |[xid](https://github.com/rs/xid) | Generates globally unique IDs | Used to assign messages unique message ids |
 |[Network-go](https://github.com/TTK4145/Network-go) | Network module | Used as inspiration as well as a few functions used to create connection and getting IP address. Broadcast module reimplemented to allow better resource management (contexts). Peer module (heartbeats) redesigned to allow adding costs. |
-|[context](https://golang.org/x/net/context)| | |
+|[context](https://golang.org/x/net/context)|Goroutine context management (included in standard library from Golang 1.7)|To stop the goroutine if the context is no longer valid|
 
 

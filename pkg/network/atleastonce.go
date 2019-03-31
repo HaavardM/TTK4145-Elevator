@@ -104,7 +104,7 @@ func RunAtLeastOnce(ctx context.Context, conf AtLeastOnceConfig) {
 
 			b, err := json.Marshal(r.Data)
 			if err != nil {
-				log.Println("error receiving message: ", err)
+				log.Println("Error receiving message: ", err)
 			}
 			v := reflect.New(T)
 			err = json.Unmarshal(b, v.Interface())

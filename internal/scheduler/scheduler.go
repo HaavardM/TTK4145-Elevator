@@ -123,7 +123,6 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		if err != nil {
 			log.Panicf("Error reading from file: %s\n", err)
 		}
-		log.Printf("Loading orders from file: %+v\n", fileOrders)
 		spew.Dump(fileOrders)
 		publishAllHallOrders(ctx, fileOrders, conf.NewOrderSend)
 		//Replace orders with orders from file
@@ -141,7 +140,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		select {
 		case <-ctx.Done():
 			//Delete orders file on clean exit
-			deleteOrdersFile(conf.FilePath)
+			//deleteOrdersFile(conf.FilePath)
 			return
 		case <-skipSelect:
 			//Continue after select
@@ -149,7 +148,6 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			delete(workers, id)
 			reassignInvalidOrders(ctx, &orders, orderTimeout, workers, conf.NewOrderSend)
 		case <-orderTimeoutTicker.C:
-			log.Println("timeout")
 			reassignInvalidOrders(ctx, &orders, orderTimeout, workers, conf.NewOrderSend)
 		case elevatorStatus = <-conf.ElevStatus:
 			//Updates elevator stauts
@@ -164,7 +162,6 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 		case order := <-conf.OrderCompletedRecv:
 			handleOrderCompleted(&orders, order, conf)
 		case order := <-conf.ElevCompletedOrder:
-			log.Printf("Elev completed order %v\n", order)
 			//Save previous order
 			orders.Cab[order.Floor] = nil
 			completedTime := time.Now()
@@ -196,11 +193,9 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 			}
 
 		case btn := <-conf.ElevButtonPressed:
-			log.Printf("Button pressed %v\n", btn)
 			if btn.Button == elevio.BT_Cab {
 				if orders.Cab[btn.Floor] == nil {
 					orders.Cab[btn.Floor] = createOrder(btn.Floor, common.NoDir, conf.ElevatorID)
-					log.Println("Local cabcall added with floor: ", btn.Floor)
 				}
 			} else {
 				handleElevHallBtnPressed(ctx, btn, workers, conf.NewOrderSend)
@@ -273,7 +268,6 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 	hallOrders := make([]*SchedulableOrder, 0, len(orders.HallDown)+len(orders.HallUp))
 	hallOrders = append(hallOrders, orders.HallDown...)
 	hallOrders = append(hallOrders, orders.HallUp...)
-	log.Printf("%+v\n", hallOrders)
 	//Check for timeout or invalid assignee
 	for _, order := range hallOrders {
 		renewOrder := false
@@ -284,7 +278,6 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 		//Check if timeout have passed
 		if time.Now().Sub(order.Timestamp) > timeout {
 			renewOrder = true
-			log.Println("Order timeout")
 		}
 
 		//If order is completed and has been for some time
@@ -302,6 +295,7 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 			newOrder := createOrder(order.Floor, order.Dir, worker)
 			//Send new order event to network when available
 			go utilities.SendMessage(ctx, sendOrder, *newOrder)
+			log.Printf("Renewing order %+v\n ", newOrder)
 		}
 	}
 
@@ -311,7 +305,6 @@ func reassignInvalidOrders(ctx context.Context, orders *schedOrders, timeout tim
 		}
 
 		if time.Now().Sub(order.Timestamp) > timeout {
-			log.Printf("Order %v timeout\n", order)
 			order.Timestamp = time.Now()
 		}
 	}
@@ -481,9 +474,7 @@ func handleOrderCompleted(orders *schedOrders, order SchedulableOrder, conf Conf
 		if err := tryRemoveOrderFromSlice(orders.HallDown, order.Floor); err != nil {
 			log.Println("Error removing order: ", err)
 		}
-
 	}
-
 }
 
 //Adds an order to a slice of scheduled orders
