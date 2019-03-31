@@ -62,6 +62,7 @@ func createElevatorCost(status common.ElevatorStatus, orders *schedOrders, id in
 		for ; currFloor < len(currentQueue) && currFloor >= 0; currFloor += searchDirIncrement {
 			orderCost := float64(costCounter + orderCount)
 			currCost[currFloor] = orderCost
+			newCost.Cab[currFloor] = orderCost + cabPenalty
 			costCounter++
 		}
 
@@ -80,6 +81,10 @@ func createElevatorCost(status common.ElevatorStatus, orders *schedOrders, id in
 		for currFloor += searchDirIncrement; currFloor < len(currentQueue) && currFloor >= 0; currFloor += searchDirIncrement {
 			orderCost := float64(costCounter + orderCount)
 			currCost[currFloor] = orderCost
+			//If no cab cost have been added already
+			if newCost.Cab[currFloor] <= cabPenalty/2 {
+				newCost.Cab[currFloor] = orderCost + cabPenalty
+			}
 			costCounter++
 		}
 
@@ -99,19 +104,6 @@ func createElevatorCost(status common.ElevatorStatus, orders *schedOrders, id in
 			orderCost := float64(costCounter + orderCount)
 			currCost[currFloor] = orderCost
 			costCounter++
-		}
-
-		//Invalid cost for impossible orders
-		newCost.HallUp[len(newCost.HallUp)-1] = -1
-		newCost.HallDown[0] = -1
-
-		//Select cheapest order and add cab penalty for cab orders
-		for i := range newCost.Cab {
-			newCost.Cab[i] = newCost.HallUp[i]
-			if newCost.Cab[i] < 0 || (newCost.HallDown[i] < newCost.Cab[i] && newCost.HallDown[i] >= 0) {
-				newCost.Cab[i] = newCost.HallDown[i]
-			}
-			newCost.Cab[i] += cabPenalty
 		}
 	}
 

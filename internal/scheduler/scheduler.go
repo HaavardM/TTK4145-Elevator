@@ -241,7 +241,7 @@ func Run(ctx context.Context, waitGroup *sync.WaitGroup, conf Config) {
 	}
 }
 
-//setLightsFromOrders sets the order lights when the order is confirmed and saved to file 
+//setLightsFromOrders sets the order lights when the order is confirmed and saved to file
 func setLightsFromOrders(orders schedOrders, lights chan<- elevatordriver.LightState, numFloors int) {
 	//Set order lights
 	for floor, order := range orders.HallUp {
@@ -395,18 +395,6 @@ func getCheapestActiveOrder(orders *schedOrders, cost *common.OrderCosts, id int
 	currMinCost := math.Inf(1)
 	var currOrder *SchedulableOrder
 
-	//Check cab calls
-	for _, order := range orders.Cab {
-		if order == nil || order.Worker != id || order.completed != nil {
-			continue
-		}
-		orderCost := cost.Cab[order.Floor]
-		if orderCost < currMinCost {
-			currMinCost = orderCost
-			currOrder = order
-		}
-	}
-
 	//Check down hall orders
 	for _, order := range orders.HallDown {
 		if order == nil || order.Worker != id || order.completed != nil {
@@ -425,6 +413,18 @@ func getCheapestActiveOrder(orders *schedOrders, cost *common.OrderCosts, id int
 			continue
 		}
 		orderCost := cost.HallUp[order.Floor]
+		if orderCost < currMinCost {
+			currMinCost = orderCost
+			currOrder = order
+		}
+	}
+
+	//Check cab calls
+	for _, order := range orders.Cab {
+		if order == nil || order.Worker != id || order.completed != nil {
+			continue
+		}
+		orderCost := cost.Cab[order.Floor]
 		if orderCost < currMinCost {
 			currMinCost = orderCost
 			currOrder = order
