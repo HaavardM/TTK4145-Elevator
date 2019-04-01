@@ -3,15 +3,57 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:b7abda343fca000887c10aa96682767d92824febbc1f0362045af96bd53bc6d5"
+  name = "github.com/TTK4145/Network-go"
+  packages = [
+    "network/conn",
+    "network/localip",
+  ]
+  pruneopts = "UT"
+  revision = "80c76ced719b305985e8aa5426b0222f20841001"
+
+[[projects]]
+  branch = "master"
   digest = "1:75985964b49dd9c2bee16c81ec28efd1ff79ba04b231f51cac8f0071b40bcf68"
   name = "github.com/TTK4145/driver-go"
   packages = ["elevio"]
   pruneopts = "UT"
   revision = "d63fde1778d16f5eb303fd06af55ca144cdc5fae"
 
+[[projects]]
+  digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  pruneopts = "UT"
+  revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
+  version = "v1.1.1"
+
+[[projects]]
+  digest = "1:2e76a73cb51f42d63a2a1a85b3dc5731fd4faf6821b434bd0ef2c099186031d6"
+  name = "github.com/rs/xid"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "15d26544def341f036c5f8dca987a4cbe575032c"
+  version = "v1.2.1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:76ee51c3f468493aff39dbacc401e8831fbb765104cbf613b89bef01cf4bad70"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  pruneopts = "UT"
+  revision = "74de082e2cca95839e88aa0aeee5aadf6ce7710f"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  input-imports = ["github.com/TTK4145/driver-go/elevio"]
+  input-imports = [
+    "github.com/TTK4145/Network-go/network/conn",
+    "github.com/TTK4145/Network-go/network/localip",
+    "github.com/TTK4145/driver-go/elevio",
+    "github.com/davecgh/go-spew/spew",
+    "github.com/rs/xid",
+    "golang.org/x/net/context",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
