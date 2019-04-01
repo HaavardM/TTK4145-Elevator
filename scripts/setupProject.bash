@@ -1,15 +1,20 @@
 #!/bin/bash
 
-PATH=$GOPATH/src/github.com/TTK4145-students-2019
+PROJECT_PATH=$GOPATH/src/github.com/TTK4145-students-2019
 
-set -e
-mkdir -p $PATH
 set +e
+mkdir -p $PROJECT_PATH
 
-cd $PATH
+cd $PROJECT_PATH
 
 git clone https://github.com/TTK4145-students-2019/project-thefuturezebras.git
 
-cd $PATH/project-thefuturezebras.git
+set -e
+
+
+cd $PROJECT_PATH/project-thefuturezebras
+go get
+
+echo "Project ready!"
 
 
