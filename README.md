@@ -1,7 +1,7 @@
 Elevator Project
 ================
 
-[![Build Status](https://build.shapingideas.fyi/job/thefuturezebras/job/project-thefuturezebras/job/master/2/badge/icon)](https://build.shapingideas.fyi/job/thefuturezebras/job/project-thefuturezebras/job/master/2/)
+[![Build Status](https://build.shapingideas.fyi/job/HaavardM/job/TTK4145-Elevator/job/master/badge/icon)](https://build.shapingideas.fyi/job/HaavardM/job/TTK4145-Elevator/job/master/)
 
 Folder structure
 ----------------
