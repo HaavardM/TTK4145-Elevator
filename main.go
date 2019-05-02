@@ -9,11 +9,11 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/HaavardM/TTK4145-Elevator/internal/common"
 	"github.com/HaavardM/TTK4145-Elevator/internal/configuration"
 	"github.com/HaavardM/TTK4145-Elevator/internal/elevatorcontroller"
 	"github.com/HaavardM/TTK4145-Elevator/internal/elevatordriver"
 	"github.com/HaavardM/TTK4145-Elevator/internal/scheduler"
+	"github.com/HaavardM/TTK4145-Elevator/pkg/common"
 	"github.com/HaavardM/TTK4145-Elevator/pkg/network"
 
 	"github.com/TTK4145/driver-go/elevio"

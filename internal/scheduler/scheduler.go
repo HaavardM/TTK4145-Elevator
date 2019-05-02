@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/HaavardM/TTK4145-Elevator/internal/common"
 	"github.com/HaavardM/TTK4145-Elevator/internal/elevatordriver"
+	"github.com/HaavardM/TTK4145-Elevator/pkg/common"
 	"github.com/HaavardM/TTK4145-Elevator/pkg/utilities"
 	"github.com/rs/xid"
 

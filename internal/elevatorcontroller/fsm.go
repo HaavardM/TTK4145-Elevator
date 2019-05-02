@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/HaavardM/TTK4145-Elevator/internal/common"
 	"github.com/HaavardM/TTK4145-Elevator/internal/elevatordriver"
+	"github.com/HaavardM/TTK4145-Elevator/pkg/common"
 	"golang.org/x/net/context"
 )
 
