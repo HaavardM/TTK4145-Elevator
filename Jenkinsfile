@@ -12,7 +12,7 @@ volumes: [
         def repo = checkout scm
         def commit = repo.GIT_COMMIT
         def branch = repo.GIT_BRANCH
-        def registry = "thefuturezebras/project"
+        def registry = "haavardm/ttk4145-elevator"
         def credentidal = "dockerhub"
 
         stage('Build image') {
