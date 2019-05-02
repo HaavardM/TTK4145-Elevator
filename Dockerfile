@@ -1,7 +1,7 @@
 FROM golang:1.6
 
 EXPOSE 15657
-WORKDIR $GOPATH/src/github.com/TTK4145-students-2019/project-thefuturezebras
+WORKDIR $GOPATH/src/github.com/HaavardM/TTK4145-Elevator
 
 ADD . .
 RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh && dep ensure
