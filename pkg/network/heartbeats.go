@@ -5,9 +5,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/HaavardM/TTK4145-Elevator/internal/common"
 	"golang.org/x/net/context"
-
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
 )
 
 const heartbInterval = 50 * time.Millisecond

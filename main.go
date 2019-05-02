@@ -9,13 +9,13 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/network"
+	"github.com/HaavardM/TTK4145-Elevator/internal/common"
+	"github.com/HaavardM/TTK4145-Elevator/internal/configuration"
+	"github.com/HaavardM/TTK4145-Elevator/internal/elevatorcontroller"
+	"github.com/HaavardM/TTK4145-Elevator/internal/elevatordriver"
+	"github.com/HaavardM/TTK4145-Elevator/internal/scheduler"
+	"github.com/HaavardM/TTK4145-Elevator/pkg/network"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/configuration"
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatorcontroller"
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/scheduler"
 	"github.com/TTK4145/driver-go/elevio"
 )
 

@@ -4,11 +4,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/HaavardM/TTK4145-Elevator/internal/common"
+	"github.com/HaavardM/TTK4145-Elevator/internal/elevatordriver"
 	"golang.org/x/net/context"
-
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
-
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 )
 
 const (

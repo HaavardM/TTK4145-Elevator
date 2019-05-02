@@ -11,15 +11,12 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/HaavardM/TTK4145-Elevator/internal/common"
+	"github.com/HaavardM/TTK4145-Elevator/internal/elevatordriver"
+	"github.com/HaavardM/TTK4145-Elevator/pkg/utilities"
 	"github.com/rs/xid"
 
 	"github.com/davecgh/go-spew/spew"
-
-	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
-
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
-
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/elevatordriver"
 
 	"github.com/TTK4145/driver-go/elevio"
 )

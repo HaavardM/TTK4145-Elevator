@@ -3,7 +3,7 @@ package scheduler
 import (
 	"math"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/internal/common"
+	"github.com/HaavardM/TTK4145-Elevator/internal/common"
 )
 
 func createElevatorCost(status common.ElevatorStatus, orders *schedOrders, id int) common.OrderCosts {

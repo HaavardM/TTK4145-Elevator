@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	
-	"github.com/rs/xid"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
+	"github.com/HaavardM/TTK4145-Elevator/pkg/utilities"
+	"github.com/rs/xid"
 )
 
 type atLeastOnceMsg struct {

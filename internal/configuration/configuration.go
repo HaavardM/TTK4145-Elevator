@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/network"
+	"github.com/HaavardM/TTK4145-Elevator/pkg/network"
 )
 
 //Config type contains system configuration

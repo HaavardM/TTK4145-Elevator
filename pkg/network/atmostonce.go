@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
+	"github.com/HaavardM/TTK4145-Elevator/pkg/utilities"
 )
 
 //AtMostOnceConfig is a configuration struct used to configure atMostOnce

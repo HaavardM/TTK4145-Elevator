@@ -6,9 +6,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/HaavardM/TTK4145-Elevator/pkg/utilities"
 	"golang.org/x/net/context"
-
-	"github.com/TTK4145-students-2019/project-thefuturezebras/pkg/utilities"
 )
 
 type broadcastMsg struct {
