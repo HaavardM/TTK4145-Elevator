@@ -10,9 +10,11 @@ read id
 echo "Enter port"
 read port
 
+mkdir -p $id
+
 start_elevator () {
     sleep 2
-    go run --race ../main.go --id=$id --elevator-port=$port --folder=/home/haavard
+    go run --race ../main.go --id=$id --elevator-port=$port --folder=$id/orders.json
 }
 
 start_elevator&
